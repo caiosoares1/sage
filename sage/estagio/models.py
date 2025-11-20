@@ -4,6 +4,7 @@ from users.models import Usuario
 from admin.models import Supervisor
 from admin.models import Empresa
 from estagio.models import Estagio
+from admin.models import CursoCoordenador
 
 class Aluno(models.Model):
     """Modelo de aluno especializado de usuário"""
@@ -21,6 +22,12 @@ class Aluno(models.Model):
 
 
 class Estagio(models.Model):
+    STATUS_CHOICES = [
+        ('analise', 'Em análise'),
+        ('aprovado', 'Aprovado'),
+        ('reprovado', 'Reprovado'),
+    ]
+
     data_inicio = models.DateField()
     titulo = models.CharField(max_length=30)
     cargo = models.CharField(max_length=50)
@@ -29,6 +36,12 @@ class Estagio(models.Model):
 
     empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE)
     supervisor = models.ForeignKey(Supervisor, on_delete=models.CASCADE)
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='analise'
+    )
 
     def __str__(self):
         return self.titulo
@@ -50,7 +63,7 @@ class Avaliacao(models.Model):
 
 class Documento(models.Model):
     data_envio = models.DateField()
-    valor = models.FloatField()
+    versao = models.FloatField()
     nome_arquivo = models.CharField(max_length=50)
     tipo = models.CharField(max_length=50)
 
@@ -58,7 +71,7 @@ class Documento(models.Model):
 
     estagio = models.ForeignKey(Estagio, on_delete=models.CASCADE)
     supervisor = models.ForeignKey(Supervisor, on_delete=models.CASCADE)
-    coordenador = models.ForeignKey(Usuario, on_delete=models.CASCADE)
+    coordenador = models.ForeignKey(CursoCoordenador, on_delete=models.CASCADE)
 
     def __str__(self):
         return self.nome_arquivo
