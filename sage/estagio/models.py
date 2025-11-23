@@ -3,7 +3,6 @@ from admin.models import Instituicao
 from users.models import Usuario
 from admin.models import Supervisor
 from admin.models import Empresa
-from estagio.models import Estagio
 from admin.models import CursoCoordenador
 
 class Aluno(models.Model):
@@ -14,7 +13,7 @@ class Aluno(models.Model):
     matricula = models.CharField(max_length=11, unique=True)
     usuario = models.OneToOneField(Usuario, on_delete=models.CASCADE)
     instituicao = models.ForeignKey(Instituicao, on_delete=models.CASCADE)
-    estagio = models.ForeignKey(Estagio, on_delete=models.cascade, null=True, blank=True)
+    estagio = models.ForeignKey('Estagio', on_delete=models.CASCADE, null=True, blank=True)
 
     def __str__(self):
         return f"{self.nome} - {self.matricula}"
