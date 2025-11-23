@@ -41,7 +41,7 @@ def listar_solicitacoes_coordenador(request):
             'documentos': documentos,
             'coordenador': coordenador
         }
-        return render(request, "listar_solicitacoes_coordenador.html", context)
+        return render(request, "admin/listar_solicitacoes_coordenador.html", context)
     except (Usuario.DoesNotExist, CursoCoordenador.DoesNotExist):
         messages.error(request, "Coordenador não encontrado!")
         return redirect('home')
