@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+
+{% block title %}Detalhes do Estágio - SAGE{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <h1>Detalhes do Estágio</h1>
+        <a href="{% url 'acompanhar_estagios' %}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Voltar
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="detail-section">
+            <h2>{{ estagio.titulo }}</h2>
+            
+            <div class="detail-grid">
+                <div class="detail-item">
+                    <label>Empresa:</label>
+                    <p>{{ estagio.empresa.razao_social }}</p>
+                </div>
+
+                <div class="detail-item">
+                    <label>Supervisor:</label>
+                    <p>{{ estagio.supervisor.nome }}</p>
+                </div>
+
+                <div class="detail-item">
+                    <label>Data de Início:</label>
+                    <p>{{ estagio.data_inicio|date:"d/m/Y" }}</p>
+                </div>
+
+                <div class="detail-item">
+                    <label>Data de Término:</label>
+                    <p>{{ estagio.data_fim|date:"d/m/Y" }}</p>
+                </div>
+
+                <div class="detail-item">
+                    <label>Carga Horária:</label>
+                    <p>{{ estagio.carga_horaria }}h/semana</p>
+                </div>
+
+                <div class="detail-item">
+                    <label>Status:</label>
+                    <p>
+                        {% if estagio.status == 'analise' %}
+                            <span class="badge badge-pending">Em Análise</span>
+                        {% elif estagio.status == 'aprovado' %}
+                            <span class="badge badge-approved">Aprovado</span>
+                        {% elif estagio.status == 'reprovado' %}
+                            <span class="badge badge-rejected">Reprovado</span>
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+
+            <div class="detail-item full-width">
+                <label>Descrição:</label>
+                <p>{{ estagio.descricao }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.detail-section {
+    padding: 1rem;
+}
+
+.detail-section h2 {
+    font-size: 1.5rem;
+    margin-bottom: 2rem;
+    color: var(--text-dark);
+}
+
+.detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.detail-item {
+    margin-bottom: 1rem;
+}
+
+.detail-item.full-width {
+    grid-column: 1 / -1;
+}
+
+.detail-item label {
+    display: block;
+    font-weight: 600;
+    color: var(--text-gray);
+    font-size: 0.875rem;
+    margin-bottom: 0.5rem;
+}
+
+.detail-item p {
+    color: var(--text-dark);
+    font-size: 1rem;
+}
+
+.btn-secondary {
+    background-color: var(--text-gray);
+    color: var(--white);
+}
+
+.btn-secondary:hover {
+    background-color: #4B5563;
+}
+</style>
+{% endblock %}
