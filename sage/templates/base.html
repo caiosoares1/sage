@@ -1,0 +1,76 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Academic Internship Management System{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-container">
+            <div class="logo">
+                <i class="fas fa-graduation-cap"></i>
+                <div class="logo-text">
+                    <h1>Academic Internship Management System</h1>
+                    <p>Manage internships, students, and enterprises</p>
+                </div>
+            </div>
+            <div class="user-info">
+                {% if user.is_authenticated %}
+                    <span>Olá, {{ user.username }}</span>
+                    <a href="{% url 'admin:logout' %}" class="btn-logout">Sair</a>
+                {% else %}
+                    <a href="{% url 'admin:login' %}" class="btn-login">Login</a>
+                {% endif %}
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="{% url 'dashboard' %}" class="nav-item {% block nav_dashboard %}{% endblock %}">
+                Painel
+            </a>
+            <a href="{% url 'acompanhar_estagios' %}" class="nav-item {% block nav_estagios %}{% endblock %}">
+                Meus Estágios
+            </a>
+            <a href="{% url 'solicitar_estagio' %}" class="nav-item {% block nav_solicitar %}{% endblock %}">
+                Solicitar Estágio
+            </a>
+            <a href="{% url 'listar_solicitacoes_coordenador' %}" class="nav-item {% block nav_coordenador %}{% endblock %}">
+                Coordenação
+            </a>
+        </div>
+    </nav>
+
+    <!-- Messages -->
+    {% if messages %}
+    <div class="messages-container">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Main Content -->
+    <main class="main-content">
+        {% block content %}
+        {% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>&copy; 2025 Academic Internship Management System. All rights reserved.</p>
+    </footer>
+
+    <script src="{% static 'js/script.js' %}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
