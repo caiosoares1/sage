@@ -1,0 +1,263 @@
+{% extends 'base.html' %}
+
+{% block title %}Solicitar Estágio - SAGE{% endblock %}
+
+{% block content %}
+<div class="form-container">
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Solicitar Estágio</h2>
+            <p class="text-muted">Preencha todos os campos obrigatórios para enviar sua solicitação</p>
+        </div>
+
+        <form method="post" enctype="multipart/form-data" id="estagioForm" novalidate>
+            {% csrf_token %}
+            
+            <!-- Informações do Estágio -->
+            <h3 class="section-title">Informações do Estágio</h3>
+            
+            <div class="form-group">
+                <label for="{{ estagio_form.titulo.id_for_label }}">{{ estagio_form.titulo.label }} *</label>
+                {{ estagio_form.titulo }}
+                {% if estagio_form.titulo.errors %}
+                    <span class="error">{{ estagio_form.titulo.errors.0 }}</span>
+                {% endif %}
+                <small class="form-help">Máximo 30 caracteres</small>
+            </div>
+
+            <div class="form-group">
+                <label for="{{ estagio_form.cargo.id_for_label }}">{{ estagio_form.cargo.label }} *</label>
+                {{ estagio_form.cargo }}
+                {% if estagio_form.cargo.errors %}
+                    <span class="error">{{ estagio_form.cargo.errors.0 }}</span>
+                {% endif %}
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="{{ estagio_form.empresa.id_for_label }}">{{ estagio_form.empresa.label }} *</label>
+                    {{ estagio_form.empresa }}
+                    {% if estagio_form.empresa.errors %}
+                        <span class="error">{{ estagio_form.empresa.errors.0 }}</span>
+                    {% endif %}
+                </div>
+
+                <div class="form-group">
+                    <label for="{{ estagio_form.supervisor.id_for_label }}">{{ estagio_form.supervisor.label }} *</label>
+                    {{ estagio_form.supervisor }}
+                    {% if estagio_form.supervisor.errors %}
+                        <span class="error">{{ estagio_form.supervisor.errors.0 }}</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="{{ estagio_form.data_inicio.id_for_label }}">{{ estagio_form.data_inicio.label }} *</label>
+                    {{ estagio_form.data_inicio }}
+                    {% if estagio_form.data_inicio.errors %}
+                        <span class="error">{{ estagio_form.data_inicio.errors.0 }}</span>
+                    {% endif %}
+                </div>
+
+                <div class="form-group">
+                    <label for="{{ estagio_form.data_fim.id_for_label }}">{{ estagio_form.data_fim.label }} *</label>
+                    {{ estagio_form.data_fim }}
+                    {% if estagio_form.data_fim.errors %}
+                        <span class="error">{{ estagio_form.data_fim.errors.0 }}</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="{{ estagio_form.carga_horaria.id_for_label }}">{{ estagio_form.carga_horaria.label }} *</label>
+                {{ estagio_form.carga_horaria }}
+                {% if estagio_form.carga_horaria.errors %}
+                    <span class="error">{{ estagio_form.carga_horaria.errors.0 }}</span>
+                {% endif %}
+                <small class="form-help">Entre 1 e 40 horas por semana</small>
+            </div>
+
+            <!-- Informações do Documento -->
+            <h3 class="section-title">Documentação</h3>
+
+            <div class="form-group">
+                <label for="{{ documento_form.coordenador.id_for_label }}">{{ documento_form.coordenador.label }} *</label>
+                {{ documento_form.coordenador }}
+                {% if documento_form.coordenador.errors %}
+                    <span class="error">{{ documento_form.coordenador.errors.0 }}</span>
+                {% endif %}
+                <small class="form-help">Selecione o coordenador do seu curso</small>
+            </div>
+
+            <div class="form-group">
+                <label for="{{ documento_form.arquivo.id_for_label }}">{{ documento_form.arquivo.label }} *</label>
+                {{ documento_form.arquivo }}
+                {% if documento_form.arquivo.errors %}
+                    <span class="error">{{ documento_form.arquivo.errors.0 }}</span>
+                {% endif %}
+                <small class="form-help">Formato: PDF | Tamanho máximo: 10MB</small>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-paper-plane"></i> Enviar Solicitação
+                </button>
+                <a href="{% url 'acompanhar_estagios' %}" class="btn btn-secondary">
+                    <i class="fas fa-times"></i> Cancelar
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.form-container {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.text-muted {
+    color: var(--text-gray);
+    font-size: 0.875rem;
+    margin-top: 0.5rem;
+}
+
+.section-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--text-dark);
+    margin: 2rem 0 1rem 0;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.form-control {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 1rem;
+    transition: border-color 0.3s;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.form-control.is-invalid {
+    border-color: var(--danger-color);
+}
+
+.form-help {
+    display: block;
+    margin-top: 0.25rem;
+    color: var(--text-gray);
+    font-size: 0.875rem;
+}
+
+.error {
+    display: block;
+    color: var(--danger-color);
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+    font-weight: 500;
+}
+
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.btn-secondary {
+    background-color: var(--text-gray);
+    color: var(--white);
+}
+
+.btn-secondary:hover {
+    background-color: #4B5563;
+}
+
+.btn i {
+    margin-right: 0.5rem;
+}
+
+@media (max-width: 768px) {
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .form-actions {
+        flex-direction: column;
+    }
+    
+    .form-actions .btn {
+        width: 100%;
+    }
+}
+</style>
+
+<script>
+// Validação no cliente
+document.getElementById('estagioForm')?.addEventListener('submit', function(e) {
+    let isValid = true;
+    const form = e.target;
+    
+    // Limpar erros anteriores
+    form.querySelectorAll('.form-control').forEach(input => {
+        input.classList.remove('is-invalid');
+    });
+    
+    // Validar campos obrigatórios
+    form.querySelectorAll('[required]').forEach(input => {
+        if (!input.value.trim()) {
+            input.classList.add('is-invalid');
+            isValid = false;
+        }
+    });
+    
+    // Validar datas
+    const dataInicio = form.querySelector('[name="data_inicio"]');
+    const dataFim = form.querySelector('[name="data_fim"]');
+    
+    if (dataInicio && dataFim && dataInicio.value && dataFim.value) {
+        if (new Date(dataFim.value) <= new Date(dataInicio.value)) {
+            dataFim.classList.add('is-invalid');
+            isValid = false;
+        }
+    }
+    
+    // Validar arquivo
+    const arquivo = form.querySelector('[name="arquivo"]');
+    if (arquivo && arquivo.files[0]) {
+        const file = arquivo.files[0];
+        if (file.size > 10 * 1024 * 1024) {
+            arquivo.classList.add('is-invalid');
+            alert('O arquivo não pode ser maior que 10MB.');
+            isValid = false;
+        }
+        if (!file.name.endsWith('.pdf')) {
+            arquivo.classList.add('is-invalid');
+            alert('Apenas arquivos PDF são permitidos.');
+            isValid = false;
+        }
+    }
+    
+    if (!isValid) {
+        e.preventDefault();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+});
+</script>
+{% endblock %}
