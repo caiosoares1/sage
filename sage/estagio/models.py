@@ -4,6 +4,7 @@ from users.models import Usuario
 from admin.models import Supervisor
 from admin.models import Empresa
 from admin.models import CursoCoordenador
+from django.utils import timezone
 
 class Aluno(models.Model):
     """Modelo de aluno especializado de usuário"""
@@ -61,6 +62,13 @@ class Avaliacao(models.Model):
 
 
 class Documento(models.Model):
+    STATUS_CHOICES = [
+        ('enviado', 'Enviado'),
+        ('ajustes_solicitados', 'Ajustes solicitados'),
+        ('corrigido', 'Corrigido'),
+        ('aprovado', 'Aprovado'),
+    ]
+
     data_envio = models.DateField()
     versao = models.FloatField()
     nome_arquivo = models.CharField(max_length=50)
@@ -72,7 +80,32 @@ class Documento(models.Model):
     supervisor = models.ForeignKey(Supervisor, on_delete=models.CASCADE)
     coordenador = models.ForeignKey(CursoCoordenador, on_delete=models.CASCADE)
 
+    parent = models.ForeignKey('self', null=True, blank=True, related_name='versions', on_delete=models.SET_NULL)
+
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='enviado')
+
+    observacoes_supervisor = models.TextField(null=True, blank=True)
+
+    enviado_por = models.ForeignKey(Usuario, null=True, blank=True, on_delete=models.SET_NULL)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
     def __str__(self):
         return self.nome_arquivo
+
+    def get_history(self):
+        """
+        Retorna lista com a cadeia de versões: a versão atual e todas as versões anteriores.
+        A ordem pode ser do mais antigo para o mais recente se desejado.
+        """
+        history = []
+        # navegar para trás até a raiz
+        node = self
+        while node:
+            history.append(node)
+            node = node.parent
+        # history contém [atual, parent, parent.parent, ...]; inverter para mostrar do mais antigo
+        return list(reversed(history))
 
 

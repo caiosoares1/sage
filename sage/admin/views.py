@@ -2,9 +2,9 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from estagio.models import Estagio, Documento
-from .models import CursoCoordenador
+from .models import CursoCoordenador,Supervisor
 from users.models import Usuario
-
+from utils.email import enviar_notificacao_email
 
 @login_required
 def aprovar_estagio(request, estagio_id):
@@ -13,7 +13,16 @@ def aprovar_estagio(request, estagio_id):
     estagio.status = "aprovado"
     estagio.save()
     messages.success(request, f"Estágio '{estagio.titulo}' foi aprovado com sucesso!")
+    enviar_notificacao_email(
+        destinatario="email@gmail.com",
+        assunto="Estágio Aprovado",
+        mensagem=f"Seu estágio '{estagio.titulo}' foi aprovado com sucesso!"
+    )
     return redirect("estagio_detalhe", estagio.id)
+
+
+
+
 
 
 @login_required
@@ -23,7 +32,13 @@ def reprovar_estagio(request, estagio_id):
     estagio.status = "reprovado"
     estagio.save()
     messages.success(request, f"Estágio '{estagio.titulo}' foi reprovado!")
+    enviar_notificacao_email(
+        destinatario="email@gmail.com",
+        assunto="Estágio Reprovado",
+        mensagem=f"Seu estágio '{estagio.titulo}' foi reprovado com sucesso!"
+    )
     return redirect("estagio_detalhe", estagio.id)
+
 
 
 @login_required
