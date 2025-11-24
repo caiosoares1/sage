@@ -11,6 +11,7 @@ from django.views.decorators.http import require_POST
 from django.db import transaction
 from decimal import Decimal, InvalidOperation
 from utils.email import enviar_notificacao_email
+from django.utils.dateparse import parse_date
 
 
 @login_required
@@ -99,32 +100,298 @@ def estagio_detalhe(request, estagio_id):
 
 @login_required
 def supervisor_requerir_ajustes(request, documento_id):
-	"""
-	Supervisor solicita ajustes em um documento.
-	GET: exibe formulário de observações.
-	POST: salva observações, altera status e redireciona com mensagem.
-	"""
-	# checar se usuário é supervisor
-	if not Supervisor.objects.filter(usuario=getattr(request.user, 'id', request.user)).exists():
-		messages.error(request, "Permissão negada.")
-		return redirect("acompanhar_estagios")
-     
+    """Supervisor solicita ajustes em um documento.
 
-	doc = get_object_or_404(Documento, pk=documento_id)
+    GET: exibe formulário de observações.
+    POST: salva observações, altera status e redireciona com mensagem.
+    """
+    # checar se usuário é supervisor
+    if not Supervisor.objects.filter(usuario=getattr(request.user, 'id', request.user)).exists():
+        messages.error(request, "Permissão negada.")
+        return redirect("acompanhar_estagios")
 
-	if request.method == "POST":
-		observacoes = request.POST.get('observacoes', '').strip()
-		doc.status = 'ajustes_solicitados'
-		if observacoes:
-			doc.observacoes_supervisor = observacoes
-		doc.save(update_fields=['status', 'observacoes_supervisor', 'updated_at'])
-		return redirect("estagio_detalhe", estagio_id=doc.estagio.id)
+    doc = get_object_or_404(Documento, pk=documento_id)
 
-	# GET: renderiza formulário simples para inserir observações
-	return render(request, "estagio/supervisor_requerir_ajustes.html", {
-		"documento": doc,
-		"observacoes_iniciais": doc.observacoes_supervisor or ""
-	})
+    if request.method == "POST":
+        observacoes = request.POST.get('observacoes', '').strip()
+        prazo_str = request.POST.get('prazo', '').strip()
+        prazo_date = None
+        if prazo_str:
+            prazo_date = parse_date(prazo_str)
+            if prazo_date is None:
+                messages.error(request, "Formato de data inválido para o prazo. Use YYYY-MM-DD.")
+                return redirect("estagio_detalhe", estagio_id=doc.estagio.id)
+
+        doc.status = 'ajustes_solicitados'
+        if observacoes:
+            doc.observacoes_supervisor = observacoes
+        # atribuir prazo_limite se informado
+        if prazo_date:
+            doc.prazo_limite = prazo_date
+
+        # salvar campos relevantes
+        doc.save(update_fields=['status', 'observacoes_supervisor', 'prazo_limite', 'updated_at'])
+
+        # notificar por e-mail o usuário que enviou o documento com a data limite
+        recipient = None
+        if doc.enviado_por and getattr(doc.enviado_por, 'email', None):
+            recipient = doc.enviado_por.email
+        elif hasattr(doc, 'estagio'):
+            # tentar obter um aluno vinculado ao estágio
+            try:
+                aluno = Aluno.objects.get(estagio=doc.estagio)
+                if aluno and aluno.usuario and getattr(aluno.usuario, 'email', None):
+                    recipient = aluno.usuario.email
+            except Exception:
+                recipient = None
+
+        subject = f"Ajustes solicitados: {doc.nome_arquivo} - prazo estabelecido"
+        prazo_text = prazo_date.strftime('%d/%m/%Y') if prazo_date else 'sem prazo definido'
+        message = (
+            f"Seu documento '{doc.nome_arquivo}' recebeu solicitação de ajustes pelo supervisor.\n\n"
+            f"Prazo para envio das correções: {prazo_text}.\n\n"
+            f"Observações:\n{doc.observacoes_supervisor or 'Nenhuma observação.'}\n\n"
+            "Por favor, reenvie o documento até o prazo informado para evitar atraso."
+        )
+        if recipient:
+            try:
+                enviar_notificacao_email(destinatario=recipient, assunto=subject, mensagem=message)
+            except Exception:
+                pass
+
+        messages.success(request, "Ajustes solicitados com sucesso e prazo enviado ao aluno.")
+        return redirect("estagio_detalhe", estagio_id=doc.estagio.id)
+
+    # GET: renderiza formulário simples para inserir observações e prazo
+    return render(request, "estagio/supervisor_requerir_ajustes.html", {
+        "documento": doc,
+        "observacoes_iniciais": doc.observacoes_supervisor or "",
+        "prazo_inicial": doc.prazo_limite.isoformat() if getattr(doc, 'prazo_limite', None) else "",
+    })
+
+
+@login_required
+@transaction.atomic
+def supervisor_aprovar_documento(request, documento_id):
+    """Aprovar documento: registra supervisor, define status e notifica o aluno."""
+    try:
+        supervisor_obj = Supervisor.objects.get(usuario=request.user)
+    except Supervisor.DoesNotExist:
+        messages.error(request, "Permissão negada.")
+        return redirect("acompanhar_estagios")
+
+    doc = get_object_or_404(Documento, pk=documento_id)
+
+    if request.method == 'POST':
+        doc.status = 'aprovado'
+        doc.supervisor = supervisor_obj
+        doc.save()
+
+        # registrar validação como um Documento filho (histórico)
+        try:
+            Documento.objects.create(
+                data_envio=now().date(),
+                versao=doc.versao,
+                nome_arquivo=doc.nome_arquivo,
+                tipo=doc.tipo,
+                arquivo=doc.arquivo,
+                estagio=doc.estagio,
+                supervisor=supervisor_obj,
+                coordenador=doc.coordenador,
+                parent=doc,
+                status='aprovado',
+                observacoes_supervisor=None,
+                enviado_por=doc.enviado_por,
+            )
+        except Exception:
+            pass
+
+        # descobrir destinatário
+        recipient_email = None
+        if doc.enviado_por and getattr(doc.enviado_por, 'email', None):
+            recipient_email = doc.enviado_por.email
+        else:
+            try:
+                aluno = Aluno.objects.get(estagio=doc.estagio)
+                if aluno and aluno.usuario and getattr(aluno.usuario, 'email', None):
+                    recipient_email = aluno.usuario.email
+            except Exception:
+                recipient_email = None
+
+        if recipient_email:
+            enviar_notificacao_email(
+                destinatario=recipient_email,
+                assunto=f"Documento aprovado: {doc.nome_arquivo}",
+                mensagem=(
+                    f"Seu documento '{doc.nome_arquivo}' foi aprovado pelo supervisor {supervisor_obj.nome}.\n\n"
+                    "Acesse o sistema para mais informações."
+                ),
+            )
+
+        messages.success(request, "Documento aprovado com sucesso.")
+        return redirect('estagio_detalhe', estagio_id=doc.estagio.id)
+
+    return render(request, 'estagio/aprovar_documento.html', {'documento': doc})
+
+
+@login_required
+@transaction.atomic
+def supervisor_reprovar_documento(request, documento_id):
+    """Reprovar documento: registra supervisor, salva observações e notifica o aluno."""
+    try:
+        supervisor_obj = Supervisor.objects.get(usuario=request.user)
+    except Supervisor.DoesNotExist:
+        messages.error(request, "Permissão negada.")
+        return redirect("acompanhar_estagios")
+
+    doc = get_object_or_404(Documento, pk=documento_id)
+
+    if request.method == 'POST':
+        observacoes = request.POST.get('observacoes', '').strip()
+        doc.status = 'reprovado'
+        doc.supervisor = supervisor_obj
+        if observacoes:
+            doc.observacoes_supervisor = observacoes
+        doc.save()
+
+        # registrar validação como um Documento filho (histórico)
+        try:
+            Documento.objects.create(
+                data_envio=now().date(),
+                versao=doc.versao,
+                nome_arquivo=doc.nome_arquivo,
+                tipo=doc.tipo,
+                arquivo=doc.arquivo,
+                estagio=doc.estagio,
+                supervisor=supervisor_obj,
+                coordenador=doc.coordenador,
+                parent=doc,
+                status='reprovado',
+                observacoes_supervisor=observacoes or None,
+                enviado_por=doc.enviado_por,
+            )
+        except Exception:
+            pass
+
+        # descobrir destinatário
+        recipient_email = None
+        if doc.enviado_por and getattr(doc.enviado_por, 'email', None):
+            recipient_email = doc.enviado_por.email
+        else:
+            try:
+                aluno = Aluno.objects.get(estagio=doc.estagio)
+                if aluno and aluno.usuario and getattr(aluno.usuario, 'email', None):
+                    recipient_email = aluno.usuario.email
+            except Exception:
+                recipient_email = None
+
+        if recipient_email:
+            mensagem = f"Seu documento '{doc.nome_arquivo}' foi reprovado pelo supervisor {supervisor_obj.nome}.\n\n"
+            if observacoes:
+                mensagem += f"Observações:\n{observacoes}\n\n"
+            mensagem += "Por favor, acesse o sistema para mais detalhes."
+            enviar_notificacao_email(destinatario=recipient_email, assunto=f"Documento reprovado: {doc.nome_arquivo}", mensagem=mensagem)
+
+        messages.success(request, "Documento reprovado e observações registradas.")
+        return redirect('estagio_detalhe', estagio_id=doc.estagio.id)
+
+    return render(request, 'estagio/reprovar_documento.html', {'documento': doc})
+
+
+@login_required
+@transaction.atomic
+def supervisor_validar_documento(request, documento_id):
+    """Endpoint genérico para validar (aprovar, solicitar ajustes, reprovar).
+
+    Recebe `action` no POST: 'approve' | 'request_changes' | 'reject'.
+    Registra uma entrada como um `Documento` filho (histórico) e notifica o aluno.
+    """
+    try:
+        supervisor_obj = Supervisor.objects.get(usuario=request.user)
+    except Supervisor.DoesNotExist:
+        messages.error(request, "Permissão negada.")
+        return redirect('acompanhar_estagios')
+
+    doc = get_object_or_404(Documento, pk=documento_id)
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        observacoes = request.POST.get('observacoes', '').strip()
+
+        if action == 'approve':
+            doc.status = 'aprovado'
+            acao = 'aprovado'
+        elif action == 'request_changes':
+            doc.status = 'ajustes_solicitados'
+            acao = 'ajustes_solicitados'
+        elif action == 'reject':
+            doc.status = 'reprovado'
+            acao = 'reprovado'
+        else:
+            messages.error(request, 'Ação inválida.')
+            return redirect('estagio_detalhe', estagio_id=doc.estagio.id)
+
+        doc.supervisor = supervisor_obj
+        if observacoes:
+            doc.observacoes_supervisor = observacoes
+        doc.save()
+
+        # registrar validação como Documento filho (histórico)
+        try:
+            Documento.objects.create(
+                data_envio=now().date(),
+                versao=doc.versao,
+                nome_arquivo=doc.nome_arquivo,
+                tipo=doc.tipo,
+                arquivo=doc.arquivo,
+                estagio=doc.estagio,
+                supervisor=supervisor_obj,
+                coordenador=doc.coordenador,
+                parent=doc,
+                status=acao,
+                observacoes_supervisor=observacoes or None,
+                enviado_por=doc.enviado_por,
+            )
+        except Exception:
+            pass
+
+        # notificar aluno/remetente
+        recipient = None
+        if doc.enviado_por and getattr(doc.enviado_por, 'email', None):
+            recipient = doc.enviado_por.email
+        else:
+            try:
+                aluno = Aluno.objects.get(estagio=doc.estagio)
+                if aluno and aluno.usuario and getattr(aluno.usuario, 'email', None):
+                    recipient = aluno.usuario.email
+            except Exception:
+                recipient = None
+
+        if recipient:
+            assunto = f"Resultado da validação do documento: {doc.nome_arquivo}"
+            texto = f"Seu documento '{doc.nome_arquivo}' foi {acao} pelo supervisor {supervisor_obj.nome}.\n\n"
+            if observacoes:
+                texto += f"Observações:\n{observacoes}\n\n"
+            texto += "Acesse o sistema para mais detalhes."
+            enviar_notificacao_email(destinatario=recipient, assunto=assunto, mensagem=texto)
+
+        messages.success(request, f"Documento {acao} com sucesso.")
+        return redirect('estagio_detalhe', estagio_id=doc.estagio.id)
+
+    # GET: renderiza formulário de validação
+    return render(request, 'estagio/validar_documento.html', {'documento': doc})
+
+
+@login_required
+def documento_validacoes(request, documento_id):
+    """Exibe o histórico de validações para um documento específico."""
+    # checar permissão: supervisor ou aluno dono do estagio
+    doc = get_object_or_404(Documento, pk=documento_id)
+
+    # obter lista de validações relacionadas
+    validacoes = doc.validacoes.order_by('-criado_em') if hasattr(doc, 'validacoes') else []
+
+    return render(request, 'estagio/documento_validacoes.html', {'documento': doc, 'validacoes': validacoes})
 
 
 @login_required

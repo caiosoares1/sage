@@ -4,7 +4,6 @@ from users.models import Usuario
 from admin.models import Supervisor
 from admin.models import Empresa
 from admin.models import CursoCoordenador
-from django.utils import timezone
 
 class Aluno(models.Model):
     """Modelo de aluno especializado de usuário"""
@@ -67,6 +66,8 @@ class Documento(models.Model):
         ('ajustes_solicitados', 'Ajustes solicitados'),
         ('corrigido', 'Corrigido'),
         ('aprovado', 'Aprovado'),
+        ('reprovado', 'Reprovado'),
+        ('substituido', 'Substituído'),
     ]
 
     data_envio = models.DateField()
@@ -85,6 +86,8 @@ class Documento(models.Model):
     status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='enviado')
 
     observacoes_supervisor = models.TextField(null=True, blank=True)
+
+    prazo_limite = models.DateField(null=True, blank=True)
 
     enviado_por = models.ForeignKey(Usuario, null=True, blank=True, on_delete=models.SET_NULL)
 
@@ -107,5 +110,6 @@ class Documento(models.Model):
             node = node.parent
         # history contém [atual, parent, parent.parent, ...]; inverter para mostrar do mais antigo
         return list(reversed(history))
+
 
 
