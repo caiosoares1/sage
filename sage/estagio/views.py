@@ -4,7 +4,7 @@ from django.utils.timezone import now
 from django.contrib import messages
 from admin.models import CursoCoordenador,Supervisor
 from .forms import EstagioForm, DocumentoForm
-from .models import Estagio, Documento
+from .models import Estagio, Documento, DocumentoHistorico
 from users.models import Usuario
 from estagio.models import Aluno
 from django.views.decorators.http import require_POST
@@ -12,9 +12,11 @@ from django.db import transaction
 from decimal import Decimal, InvalidOperation
 from utils.email import enviar_notificacao_email
 from django.utils.dateparse import parse_date
+from utils.decorators import aluno_required
 
 
 @login_required
+@aluno_required
 def solicitar_estagio(request):
     if request.method == "POST":
         estagio_form = EstagioForm(request.POST)
@@ -49,13 +51,26 @@ def solicitar_estagio(request):
             documento.versao = 1.0
             documento.tipo = 'termo_compromisso'
             documento.nome_arquivo = documento.arquivo.name if documento.arquivo else 'documento.pdf'
+            documento.enviado_por = usuario
             documento.save()
+            
+            # Registrar no histórico
+            DocumentoHistorico.objects.create(
+                documento=documento,
+                acao='enviado',
+                usuario=usuario,
+                observacoes="Documento inicial enviado"
+            )
 
+            # Enviar notificação para o coordenador
+            coordenador_email = coordenador.usuario.email if coordenador.usuario.email else 'coordenador@example.com'
             enviar_notificacao_email(
-             destinatario="email@gmail.com",
-             assunto=f"Novo documento enviado pelo aluno {aluno.nome}",
-             mensagem=f"O aluno {aluno.nome} enviou um novo documento para o estágio. Por favor, revise o documento."
-)
+                destinatario=coordenador_email,
+                assunto=f"Novo documento enviado pelo aluno {aluno.nome}",
+                mensagem=f"O aluno {aluno.nome} enviou um novo documento para o estágio '{estagio.titulo}'. Por favor, revise o documento."
+            )
+            
+            messages.success(request, "Documento enviado com sucesso! Sua solicitação está em análise.")
             return redirect("estagio_detalhe", estagio_id=estagio.id)
         else:
             messages.error(request, "Por favor, corrija os erros no formulário.")
@@ -72,6 +87,7 @@ def solicitar_estagio(request):
 
 
 @login_required
+@aluno_required
 def acompanhar_estagios(request):
     """View para listar as solicitações de estágio do aluno logado"""  
     try:
@@ -82,20 +98,155 @@ def acompanhar_estagios(request):
         
         # Como Aluno tem FK para Estagio, verificamos se existe estágio vinculado
         if aluno.estagio:
-            estagios = [aluno.estagio]
+            estagio = aluno.estagio
+            estagios = [estagio]
+            
+            # Buscar estatísticas dos documentos do estágio
+            documentos = Documento.objects.filter(estagio=estagio)
+            stats = {
+                'total': documentos.count(),
+                'enviados': documentos.filter(status='enviado').count(),
+                'aprovados_supervisor': documentos.filter(status='aprovado').count(),
+                'finalizados': documentos.filter(status='finalizado').count(),
+                'reprovados': documentos.filter(status='reprovado').count(),
+                'ajustes': documentos.filter(status='ajustes_solicitados').count(),
+            }
         else:
             estagios = []
+            stats = {}
     except (Usuario.DoesNotExist, Aluno.DoesNotExist):
         estagios = []
+        stats = {}
     
-    return render(request, "estagio/acompanhar_estagios.html", {"estagios": estagios})
+    return render(request, "estagio/acompanhar_estagios.html", {
+        "estagios": estagios,
+        "stats": stats
+    })
 
 
 @login_required
+@aluno_required
 def estagio_detalhe(request, estagio_id):
     """View para exibir detalhes de um estágio"""
     estagio = get_object_or_404(Estagio, id=estagio_id)
-    return render(request, "estagio/estagio_detalhe.html", {"estagio": estagio})
+    
+    # Buscar documentos relacionados ao estágio
+    documentos = Documento.objects.filter(
+        estagio=estagio
+    ).select_related('aprovado_por').order_by('-created_at')
+    
+    return render(request, "estagio/estagio_detalhe.html", {
+        "estagio": estagio,
+        "documentos": documentos
+    })
+
+
+@login_required
+@aluno_required
+def listar_documentos(request):
+    """View para listar todos os documentos enviados pelo aluno"""
+    try:
+        usuario = Usuario.objects.get(id=request.user.id)
+        aluno = Aluno.objects.get(usuario=usuario)
+        
+        # Buscar todos os documentos relacionados aos estágios do aluno
+        if aluno.estagio:
+            documentos = Documento.objects.filter(
+                estagio=aluno.estagio
+            ).select_related('aprovado_por').order_by('-created_at')
+        else:
+            documentos = []
+    except (Usuario.DoesNotExist, Aluno.DoesNotExist):
+        documentos = []
+    
+    return render(request, "estagio/listar_documentos.html", {"documentos": documentos})
+
+
+@login_required
+@aluno_required
+def download_documento(request, documento_id):
+    """View para fazer download de um documento"""
+    documento = get_object_or_404(Documento, id=documento_id)
+    
+    # Verificar se o usuário tem permissão para baixar
+    usuario = Usuario.objects.get(id=request.user.id)
+    try:
+        aluno = Aluno.objects.get(usuario=usuario)
+        if documento.estagio != aluno.estagio:
+            messages.error(request, "Você não tem permissão para acessar este documento.")
+            return redirect("listar_documentos")
+    except Aluno.DoesNotExist:
+        # Verificar se é supervisor ou coordenador
+        pass
+    
+    from django.http import FileResponse
+    return FileResponse(documento.arquivo.open('rb'), as_attachment=True, filename=documento.nome_arquivo)
+
+
+@login_required
+@aluno_required
+def historico_documento(request, documento_id):
+    """View para visualizar o histórico completo de um documento"""
+    try:
+        # Busca o documento
+        documento = get_object_or_404(
+            Documento.objects.select_related(
+                'estagio__empresa',
+                'estagio__supervisor',
+                'coordenador__usuario',
+                'aprovado_por',
+                'enviado_por'
+            ).prefetch_related(
+                'estagio__aluno_set__usuario'
+            ),
+            id=documento_id
+        )
+        
+        # Verificar permissão - aluno, supervisor ou coordenador
+        usuario = Usuario.objects.get(id=request.user.id)
+        tem_permissao = False
+        
+        try:
+            aluno = Aluno.objects.get(usuario=usuario)
+            if documento.estagio == aluno.estagio:
+                tem_permissao = True
+        except Aluno.DoesNotExist:
+            pass
+        
+        try:
+            supervisor = Supervisor.objects.get(usuario=usuario)
+            if documento.estagio.supervisor == supervisor:
+                tem_permissao = True
+        except Supervisor.DoesNotExist:
+            pass
+        
+        try:
+            coordenador = CursoCoordenador.objects.get(usuario=usuario)
+            if documento.coordenador == coordenador:
+                tem_permissao = True
+        except CursoCoordenador.DoesNotExist:
+            pass
+        
+        if not tem_permissao:
+            messages.error(request, "Você não tem permissão para visualizar este histórico.")
+            return redirect('dashboard')
+        
+        # Busca o histórico ordenado por data
+        historico = documento.historico.select_related('usuario').order_by('-data_hora')
+        
+        # Busca versões do documento
+        versoes = documento.get_history()
+        
+        context = {
+            'documento': documento,
+            'historico': historico,
+            'versoes': versoes
+        }
+        return render(request, "estagio/historico_documento.html", context)
+        
+    except Usuario.DoesNotExist:
+        messages.error(request, "Erro: Usuário não encontrado.")
+        return redirect('dashboard')
 
 
 @login_required
@@ -471,6 +622,114 @@ def aluno_reenviar_documento(request, documento_id):
     return render(request, "estagio/aluno_reenviar_documento.html", {
         "documento": old
     })
+
+
+@login_required
+@aluno_required
+def reenviar_documento(request, documento_id):
+    """Permite ao aluno reenviar um documento após ajustes solicitados ou reprovação"""
+    print(f"[DEBUG] reenviar_documento chamado - documento_id: {documento_id}, method: {request.method}")
+    
+    documento_original = get_object_or_404(Documento, id=documento_id)
+    print(f"[DEBUG] Documento original encontrado: {documento_original.nome_arquivo}, status: {documento_original.status}")
+    
+    # Verificar se o documento pertence ao aluno logado
+    try:
+        aluno = request.user.aluno
+        print(f"[DEBUG] Aluno: {aluno.matricula}, Estagio do doc: {documento_original.estagio.id}, Estagio do aluno: {aluno.estagio.id if aluno.estagio else 'None'}")
+        
+        if documento_original.estagio != aluno.estagio:
+            messages.error(request, "Você não tem permissão para reenviar este documento.")
+            return redirect('listar_documentos')
+    except Aluno.DoesNotExist:
+        print("[DEBUG] Aluno não existe")
+        messages.error(request, "Aluno não encontrado.")
+        return redirect('listar_documentos')
+    
+    # Verificar se o documento está em status que permite reenvio
+    if documento_original.status not in ['ajustes_solicitados', 'reprovado']:
+        print(f"[DEBUG] Status não permite reenvio: {documento_original.status}")
+        messages.error(request, f"Este documento não pode ser reenviado. Status atual: {documento_original.status}")
+        return redirect('listar_documentos')
+    
+    if request.method == "POST":
+        print("[DEBUG] Método POST detectado")
+        arquivo = request.FILES.get('arquivo')
+        observacoes = request.POST.get('observacoes', '')
+        print(f"[DEBUG] Arquivo recebido: {arquivo.name if arquivo else 'None'}, Observações: {observacoes}")
+        
+        if not arquivo:
+            messages.error(request, "É necessário enviar um arquivo.")
+            return redirect('listar_documentos')
+        
+        # Validar tamanho do arquivo (10MB)
+        if arquivo.size > 10 * 1024 * 1024:
+            messages.error(request, "O arquivo não pode ser maior que 10MB.")
+            return redirect('listar_documentos')
+        
+        # Validar extensão
+        extensao = arquivo.name.split('.')[-1].lower()
+        if extensao not in ['pdf', 'doc', 'docx']:
+            messages.error(request, "Formato de arquivo inválido. Use PDF, DOC ou DOCX.")
+            return redirect('listar_documentos')
+        
+        try:
+            with transaction.atomic():
+                # Marcar documento original como substituído
+                documento_original.status = 'substituido'
+                documento_original.save()
+                
+                # Registrar no histórico
+                DocumentoHistorico.objects.create(
+                    documento=documento_original,
+                    acao='corrigido',
+                    usuario=request.user,
+                    observacoes=f"Documento substituído por nova versão. {observacoes}"
+                )
+                
+                # Criar novo documento com versão incrementada
+                novo_documento = Documento.objects.create(
+                    estagio=documento_original.estagio,
+                    tipo=documento_original.tipo,
+                    arquivo=arquivo,
+                    nome_arquivo=arquivo.name,
+                    data_envio=now().date(),
+                    status='corrigido',  # Status 'corrigido' para reanálise
+                    versao=documento_original.versao + 1,
+                    supervisor=documento_original.supervisor,
+                    coordenador=documento_original.coordenador,
+                    enviado_por=request.user
+                )
+                
+                # Registrar criação no histórico
+                DocumentoHistorico.objects.create(
+                    documento=novo_documento,
+                    acao='corrigido',
+                    usuario=request.user,
+                    observacoes=f"Documento reenviado após correções (v{novo_documento.versao}). {observacoes}"
+                )
+                
+                # Enviar notificação ao supervisor (não bloqueia se falhar)
+                try:
+                    if documento_original.supervisor and documento_original.supervisor.usuario:
+                        nome_aluno = getattr(request.user, 'nome', None) or request.user.username
+                        enviar_notificacao_email(
+                            destinatario=documento_original.supervisor.usuario,
+                            assunto=f"Documento Corrigido - {novo_documento.tipo}",
+                            mensagem=f"O aluno {nome_aluno} reenviou o documento '{novo_documento.tipo}' após correções (versão {novo_documento.versao})."
+                        )
+                except Exception as email_error:
+                    print(f"[AVISO] Erro ao enviar email de notificação: {email_error}")
+                    # Continua normalmente mesmo se o email falhar
+                
+                messages.success(request, f"Documento reenviado com sucesso! Nova versão: v{novo_documento.versao}")
+                return redirect('listar_documentos')
+                
+        except Exception as e:
+            messages.error(request, f"Erro ao reenviar documento: {str(e)}")
+            return redirect('listar_documentos')
+    
+    return redirect('listar_documentos')
 
 
 

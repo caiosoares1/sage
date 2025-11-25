@@ -92,11 +92,28 @@
 
             <div class="form-group">
                 <label for="{{ documento_form.arquivo.id_for_label }}">{{ documento_form.arquivo.label }} *</label>
-                {{ documento_form.arquivo }}
+                <div class="file-upload-wrapper">
+                    {{ documento_form.arquivo }}
+                    <div id="fileInfo" class="file-info" style="display: none;">
+                        <div class="file-preview">
+                            <i class="fas fa-file-pdf file-icon"></i>
+                            <div class="file-details">
+                                <span class="file-name"></span>
+                                <span class="file-size"></span>
+                            </div>
+                            <button type="button" class="remove-file" onclick="removeFile()">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="upload-progress" id="uploadProgress" style="display: none;">
+                            <div class="progress-bar"></div>
+                        </div>
+                    </div>
+                </div>
                 {% if documento_form.arquivo.errors %}
                     <span class="error">{{ documento_form.arquivo.errors.0 }}</span>
                 {% endif %}
-                <small class="form-help">Formato: PDF | Tamanho máximo: 10MB</small>
+                <small class="form-help">Formatos: PDF ou DOCX | Tamanho máximo: 10MB</small>
             </div>
 
             <div class="form-actions">
@@ -247,9 +264,10 @@ document.getElementById('estagioForm')?.addEventListener('submit', function(e) {
             alert('O arquivo não pode ser maior que 10MB.');
             isValid = false;
         }
-        if (!file.name.endsWith('.pdf')) {
+        const fileName = file.name.toLowerCase();
+        if (!fileName.endsWith('.pdf') && !fileName.endsWith('.docx')) {
             arquivo.classList.add('is-invalid');
-            alert('Apenas arquivos PDF são permitidos.');
+            alert('Apenas arquivos PDF ou DOCX são permitidos.');
             isValid = false;
         }
     }
@@ -259,5 +277,149 @@ document.getElementById('estagioForm')?.addEventListener('submit', function(e) {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 });
+
+// Feedback visual de upload de arquivo
+document.addEventListener('DOMContentLoaded', function() {
+    const fileInput = document.querySelector('[name="arquivo"]');
+    const fileInfo = document.getElementById('fileInfo');
+    
+    if (fileInput) {
+        fileInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                // Validar tamanho
+                if (file.size > 10 * 1024 * 1024) {
+                    alert('O arquivo não pode ser maior que 10MB.');
+                    fileInput.value = '';
+                    fileInfo.style.display = 'none';
+                    return;
+                }
+                
+                // Validar formato
+                const fileName = file.name.toLowerCase();
+                if (!fileName.endsWith('.pdf') && !fileName.endsWith('.docx')) {
+                    alert('Apenas arquivos PDF ou DOCX são permitidos.');
+                    fileInput.value = '';
+                    fileInfo.style.display = 'none';
+                    return;
+                }
+                
+                // Exibir informações do arquivo
+                const fileNameSpan = fileInfo.querySelector('.file-name');
+                const fileSizeSpan = fileInfo.querySelector('.file-size');
+                const fileIcon = fileInfo.querySelector('.file-icon');
+                
+                fileNameSpan.textContent = file.name;
+                fileSizeSpan.textContent = formatFileSize(file.size);
+                
+                // Alterar ícone baseado no tipo
+                if (fileName.endsWith('.docx')) {
+                    fileIcon.className = 'fas fa-file-word file-icon';
+                } else {
+                    fileIcon.className = 'fas fa-file-pdf file-icon';
+                }
+                
+                fileInfo.style.display = 'block';
+            } else {
+                fileInfo.style.display = 'none';
+            }
+        });
+    }
+});
+
+function removeFile() {
+    const fileInput = document.querySelector('[name="arquivo"]');
+    const fileInfo = document.getElementById('fileInfo');
+    fileInput.value = '';
+    fileInfo.style.display = 'none';
+}
+
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+}
 </script>
+
+<style>
+.file-upload-wrapper {
+    position: relative;
+}
+
+.file-info {
+    margin-top: 1rem;
+    padding: 1rem;
+    background-color: var(--light-bg);
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+}
+
+.file-preview {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.file-icon {
+    font-size: 2rem;
+    color: var(--primary-color);
+}
+
+.fa-file-word {
+    color: #2B579A;
+}
+
+.fa-file-pdf {
+    color: #DC3545;
+}
+
+.file-details {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.file-name {
+    font-weight: 600;
+    color: var(--text-dark);
+}
+
+.file-size {
+    font-size: 0.875rem;
+    color: var(--text-gray);
+}
+
+.remove-file {
+    background: none;
+    border: none;
+    color: var(--danger-color);
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 4px;
+    transition: background-color 0.3s;
+}
+
+.remove-file:hover {
+    background-color: rgba(220, 53, 69, 0.1);
+}
+
+.upload-progress {
+    margin-top: 0.75rem;
+    height: 4px;
+    background-color: #E5E7EB;
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.progress-bar {
+    height: 100%;
+    background-color: var(--success-color);
+    transition: width 0.3s;
+    width: 0;
+}
+</style>
+
 {% endblock %}

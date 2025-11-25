@@ -61,6 +61,55 @@
             </div>
         </div>
     </div>
+
+    <!-- Seção de Documentos -->
+    {% if documentos %}
+    <div class="card" style="margin-top: 2rem;">
+        <div class="detail-section">
+            <h2><i class="fas fa-file-alt"></i> Documentos do Estágio</h2>
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead style="background-color: #f3f4f6;">
+                    <tr>
+                        <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid #e5e7eb;">Documento</th>
+                        <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid #e5e7eb;">Tipo</th>
+                        <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid #e5e7eb;">Data de Envio</th>
+                        <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid #e5e7eb;">Status</th>
+                        <th style="padding: 0.75rem; text-align: left; border-bottom: 2px solid #e5e7eb;">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for documento in documentos %}
+                    <tr style="border-bottom: 1px solid #e5e7eb;">
+                        <td style="padding: 0.75rem;">{{ documento.nome_arquivo }}</td>
+                        <td style="padding: 0.75rem;">{{ documento.tipo }}</td>
+                        <td style="padding: 0.75rem;">{{ documento.data_envio|date:"d/m/Y" }}</td>
+                        <td style="padding: 0.75rem;">
+                            {% if documento.status == 'enviado' %}
+                                <span class="badge badge-pending">Enviado</span>
+                            {% elif documento.status == 'aprovado' %}
+                                <span class="badge badge-approved">Aprovado pelo Supervisor</span>
+                            {% elif documento.status == 'finalizado' %}
+                                <span class="badge" style="background-color: #10b981; color: white; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.875rem;">Finalizado</span>
+                            {% elif documento.status == 'reprovado' %}
+                                <span class="badge badge-rejected">Reprovado</span>
+                            {% elif documento.status == 'ajustes_solicitados' %}
+                                <span class="badge" style="background-color: #f59e0b; color: white; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.875rem;">Ajustes Solicitados</span>
+                            {% elif documento.status == 'corrigido' %}
+                                <span class="badge" style="background-color: #3b82f6; color: white; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.875rem;">Corrigido</span>
+                            {% endif %}
+                        </td>
+                        <td style="padding: 0.75rem;">
+                            <a href="{% url 'historico_documento' documento.id %}" class="btn btn-sm" style="background-color: #6366f1; color: white; padding: 0.5rem 1rem; text-decoration: none; border-radius: 6px; font-size: 0.875rem;">
+                                <i class="fas fa-history"></i> Ver Histórico
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
 </div>
 
 <style>

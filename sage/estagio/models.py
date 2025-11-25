@@ -68,6 +68,7 @@ class Documento(models.Model):
         ('aprovado', 'Aprovado'),
         ('reprovado', 'Reprovado'),
         ('substituido', 'Substituído'),
+        ('finalizado', 'Finalizado'),
     ]
 
     data_envio = models.DateField()
@@ -89,7 +90,11 @@ class Documento(models.Model):
 
     prazo_limite = models.DateField(null=True, blank=True)
 
-    enviado_por = models.ForeignKey(Usuario, null=True, blank=True, on_delete=models.SET_NULL)
+    enviado_por = models.ForeignKey(Usuario, null=True, blank=True, on_delete=models.SET_NULL, related_name='documentos_enviados')
+    
+    # Campos de auditoria
+    aprovado_por = models.ForeignKey(Usuario, null=True, blank=True, on_delete=models.SET_NULL, related_name='documentos_avaliados')
+    data_aprovacao = models.DateTimeField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -111,5 +116,30 @@ class Documento(models.Model):
         # history contém [atual, parent, parent.parent, ...]; inverter para mostrar do mais antigo
         return list(reversed(history))
 
+
+class DocumentoHistorico(models.Model):
+    """Modelo para registrar histórico de validações de documentos"""
+    ACAO_CHOICES = [
+        ('enviado', 'Documento Enviado'),
+        ('aprovado', 'Aprovado pelo Supervisor'),
+        ('reprovado', 'Reprovado pelo Supervisor'),
+        ('ajustes_solicitados', 'Ajustes Solicitados'),
+        ('corrigido', 'Documento Corrigido'),
+        ('finalizado', 'Aprovado pelo Coordenador'),
+    ]
+    
+    documento = models.ForeignKey(Documento, on_delete=models.CASCADE, related_name='historico')
+    acao = models.CharField(max_length=30, choices=ACAO_CHOICES)
+    usuario = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True)
+    observacoes = models.TextField(null=True, blank=True)
+    data_hora = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-data_hora']
+        verbose_name = 'Histórico de Documento'
+        verbose_name_plural = 'Históricos de Documentos'
+    
+    def __str__(self):
+        return f"{self.get_acao_display()} - {self.documento.nome_arquivo} - {self.data_hora}"
 
 
