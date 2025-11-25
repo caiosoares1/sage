@@ -95,7 +95,7 @@ class DocumentoForm(forms.ModelForm):
             })
         }
         labels = {
-            'arquivo': 'Termo de Compromisso (PDF)'
+            'arquivo': 'Termo de Compromisso (PDF ou DOCX)'
         }
 
     def clean_arquivo(self):
