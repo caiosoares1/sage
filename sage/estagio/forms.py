@@ -91,7 +91,7 @@ class DocumentoForm(forms.ModelForm):
         widgets = {
             'arquivo': forms.FileInput(attrs={
                 'class': 'form-control',
-                'accept': '.pdf'
+                'accept': '.pdf,.docx'
             })
         }
         labels = {
@@ -105,9 +105,9 @@ class DocumentoForm(forms.ModelForm):
             if arquivo.size > 10 * 1024 * 1024:
                 raise ValidationError('O arquivo não pode ser maior que 10MB.')
             
-            # Validar extensão
-            if not arquivo.name.endswith('.pdf'):
-                raise ValidationError('Apenas arquivos PDF são permitidos.')
+            # Validar extensão (PDF ou DOCX)
+            if not (arquivo.name.endswith('.pdf') or arquivo.name.endswith('.docx')):
+                raise ValidationError('Apenas arquivos PDF ou DOCX são permitidos.')
         
         return arquivo
 

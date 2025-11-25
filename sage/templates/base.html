@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Academic Internship Management System{% endblock %}</title>
+    <title>{% block title %}Sistema de Gestão de Estágios{% endblock %}</title>
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -15,16 +15,28 @@
             <div class="logo">
                 <i class="fas fa-graduation-cap"></i>
                 <div class="logo-text">
-                    <h1>Academic Internship Management System</h1>
-                    <p>Manage internships, students, and enterprises</p>
+                    <h1>Sistema de Gestão de Estágios</h1>
+                    <p>Gerencie estágios, alunos e empresas</p>
                 </div>
             </div>
             <div class="user-info">
                 {% if user.is_authenticated %}
-                    <span>Olá, {{ user.username }}</span>
-                    <a href="{% url 'admin:logout' %}" class="btn-logout">Sair</a>
+                    <span>
+                        Olá, <strong>{{ user.nome|default:user.username }}</strong>
+                        {% if user.aluno %}
+                            <small style="color: #9ca3af; font-size: 0.875rem;">(Aluno)</small>
+                        {% elif user.supervisor %}
+                            <small style="color: #9ca3af; font-size: 0.875rem;">(Supervisor)</small>
+                        {% elif user.cursocoordenador %}
+                            <small style="color: #9ca3af; font-size: 0.875rem;">(Coordenador)</small>
+                        {% endif %}
+                    </span>
+                    <form method="post" action="{% url 'logout' %}" style="display: inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn-logout" style="background: none; border: none; cursor: pointer; color: inherit; font: inherit;">Sair</button>
+                    </form>
                 {% else %}
-                    <a href="{% url 'admin:login' %}" class="btn-login">Login</a>
+                    <a href="{% url 'login' %}" class="btn-login">Login</a>
                 {% endif %}
             </div>
         </div>
@@ -34,17 +46,37 @@
     <nav class="navbar">
         <div class="nav-container">
             <a href="{% url 'dashboard' %}" class="nav-item {% block nav_dashboard %}{% endblock %}">
-                Painel
+                <i class="fas fa-home"></i> Painel
             </a>
-            <a href="{% url 'acompanhar_estagios' %}" class="nav-item {% block nav_estagios %}{% endblock %}">
-                Meus Estágios
-            </a>
-            <a href="{% url 'solicitar_estagio' %}" class="nav-item {% block nav_solicitar %}{% endblock %}">
-                Solicitar Estágio
-            </a>
-            <a href="{% url 'listar_solicitacoes_coordenador' %}" class="nav-item {% block nav_coordenador %}{% endblock %}">
-                Coordenação
-            </a>
+            
+            {% if user.is_authenticated %}
+                <!-- Menu para Aluno -->
+                {% if user.aluno %}
+                    <a href="{% url 'acompanhar_estagios' %}" class="nav-item {% block nav_estagios %}{% endblock %}">
+                        <i class="fas fa-briefcase"></i> Meus Estágios
+                    </a>
+                    <a href="{% url 'solicitar_estagio' %}" class="nav-item {% block nav_solicitar %}{% endblock %}">
+                        <i class="fas fa-plus-circle"></i> Solicitar Estágio
+                    </a>
+                    <a href="{% url 'listar_documentos' %}" class="nav-item {% block nav_documentos %}{% endblock %}">
+                        <i class="fas fa-file-alt"></i> Meus Documentos
+                    </a>
+                {% endif %}
+                
+                <!-- Menu para Supervisor -->
+                {% if user.supervisor %}
+                    <a href="{% url 'supervisor:documentos' %}" class="nav-item {% block nav_supervisor %}{% endblock %}">
+                        <i class="fas fa-tasks"></i> Aprovar Documentos
+                    </a>
+                {% endif %}
+                
+                <!-- Menu para Coordenador -->
+                {% if user.cursocoordenador %}
+                    <a href="{% url 'coordenador:documentos' %}" class="nav-item {% block nav_coordenador %}{% endblock %}">
+                        <i class="fas fa-check-double"></i> Aprovação Final
+                    </a>
+                {% endif %}
+            {% endif %}
         </div>
     </nav>
 
@@ -67,7 +99,7 @@
 
     <!-- Footer -->
     <footer class="footer">
-        <p>&copy; 2025 Academic Internship Management System. All rights reserved.</p>
+        <p>&copy; 2025 Sistema de Gestão de Estágios. Todos os direitos reservados.</p>
     </footer>
 
     <script src="{% static 'js/script.js' %}"></script>

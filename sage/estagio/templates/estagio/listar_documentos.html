@@ -1,0 +1,538 @@
+{% extends 'base.html' %}
+
+{% block title %}Meus Documentos - SAGE{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <h1>Meus Documentos</h1>
+        <a href="{% url 'acompanhar_estagios' %}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Voltar para Estágios
+        </a>
+    </div>
+
+    {% if messages %}
+    <div style="margin-bottom: 1rem;">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}" style="padding: 1rem; border-radius: 8px; margin-bottom: 0.5rem; {% if message.tags == 'success' %}background-color: #D1FAE5; color: #065F46;{% elif message.tags == 'error' %}background-color: #FEE2E2; color: #991B1B;{% else %}background-color: #DBEAFE; color: #1E40AF;{% endif %}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if documentos %}
+    <div class="card">
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Nome do Arquivo</th>
+                        <th>Tipo</th>
+                        <th>Data de Envio</th>
+                        <th>Status</th>
+                        <th>Versão</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for documento in documentos %}
+                    <tr>
+                        <td>
+                            <i class="fas fa-file-pdf"></i>
+                            <strong>{{ documento.nome_arquivo }}</strong>
+                        </td>
+                        <td>
+                            <span class="badge badge-info">{{ documento.tipo }}</span>
+                        </td>
+                        <td>{{ documento.created_at|date:"d/m/Y H:i" }}</td>
+                        <td>
+                            {% if documento.status == 'enviado' %}
+                                <span class="badge badge-pending">
+                                    <i class="fas fa-clock"></i> Enviado
+                                </span>
+                            {% elif documento.status == 'ajustes_solicitados' %}
+                                <span class="badge badge-warning">
+                                    <i class="fas fa-exclamation-triangle"></i> Ajustes Solicitados
+                                </span>
+                            {% elif documento.status == 'corrigido' %}
+                                <span class="badge badge-info">
+                                    <i class="fas fa-edit"></i> Corrigido
+                                </span>
+                            {% elif documento.status == 'aprovado' %}
+                                <span class="badge badge-approved">
+                                    <i class="fas fa-check-circle"></i> Aprovado
+                                </span>
+                            {% elif documento.status == 'reprovado' %}
+                                <span class="badge badge-rejected">
+                                    <i class="fas fa-times-circle"></i> Reprovado
+                                </span>
+                            {% elif documento.status == 'finalizado' %}
+                                <span class="badge" style="background-color: #10b981; color: white; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.875rem;">
+                                    <i class="fas fa-check-double"></i> Finalizado
+                                </span>
+                            {% elif documento.status == 'substituido' %}
+                                <span class="badge badge-secondary">
+                                    <i class="fas fa-exchange-alt"></i> Substituído
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="version-badge">v{{ documento.versao }}</span>
+                        </td>
+                        <td>
+                            <div class="action-buttons">
+                                <a href="{% url 'download_documento' documento.id %}" class="btn-icon btn-download" title="Baixar documento">
+                                    <i class="fas fa-download"></i>
+                                </a>
+                                {% if documento.arquivo.name|slice:"-4:" == ".pdf" %}
+                                <a href="{{ documento.arquivo.url }}" target="_blank" class="btn-icon btn-view" title="Visualizar documento">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                {% endif %}
+                                <a href="{% url 'historico_documento' documento.id %}" class="btn-icon btn-history" title="Ver histórico">
+                                    <i class="fas fa-history"></i>
+                                </a>
+                                {% if documento.status == 'ajustes_solicitados' or documento.status == 'reprovado' %}
+                                <button type="button" class="btn-icon btn-upload" onclick="openReenvioModal({{ documento.id }}, '{{ documento.tipo }}')" title="Reenviar documento corrigido">
+                                    <i class="fas fa-upload"></i>
+                                </button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% if documento.observacoes_supervisor %}
+                    <tr class="observation-row">
+                        <td colspan="7">
+                            <div class="observation-box">
+                                <i class="fas fa-comment-alt"></i>
+                                <strong>Observações:</strong>
+                                <p>{{ documento.observacoes_supervisor }}</p>
+                                {% if documento.aprovado_por %}
+                                <small>Por: {{ documento.aprovado_por.nome }}{% if documento.data_aprovacao %} em {{ documento.data_aprovacao|date:"d/m/Y H:i" }}{% endif %}</small>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Legenda de Status -->
+    <div class="status-legend">
+        <h3>Legenda de Status</h3>
+        <ul>
+            <li><span class="badge badge-pending"><i class="fas fa-clock"></i> Enviado</span> - Documento aguardando análise</li>
+            <li><span class="badge badge-warning"><i class="fas fa-exclamation-triangle"></i> Ajustes Solicitados</span> - Supervisor solicitou correções</li>
+            <li><span class="badge badge-info"><i class="fas fa-edit"></i> Corrigido</span> - Documento corrigido aguardando reavaliação</li>
+            <li><span class="badge badge-approved"><i class="fas fa-check-circle"></i> Aprovado</span> - Documento aprovado pelo supervisor</li>
+            <li><span class="badge badge-rejected"><i class="fas fa-times-circle"></i> Reprovado</span> - Documento reprovado</li>
+            <li><span class="badge" style="background-color: #10b981; color: white; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.875rem;"><i class="fas fa-check-double"></i> Finalizado</span> - Documento finalizado pelo coordenador</li>
+            <li><span class="badge badge-secondary"><i class="fas fa-exchange-alt"></i> Substituído</span> - Documento foi substituído por nova versão</li>
+        </ul>
+    </div>
+
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-icon">
+            <i class="fas fa-file-alt"></i>
+        </div>
+        <h2>Nenhum documento enviado</h2>
+        <p>Você ainda não possui documentos cadastrados. Ao solicitar um estágio, você poderá enviar os documentos necessários.</p>
+        <a href="{% url 'solicitar_estagio' %}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Solicitar Estágio
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.page-container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.page-header h1 {
+    font-size: 1.875rem;
+    font-weight: 700;
+    color: var(--text-dark);
+}
+
+.action-buttons {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 6px;
+    background-color: var(--light-bg);
+    color: var(--text-gray);
+    transition: all 0.3s;
+    text-decoration: none;
+}
+
+.btn-icon:hover {
+    background-color: var(--primary-color);
+    color: var(--white);
+}
+
+.btn-download:hover {
+    background-color: var(--success-color);
+}
+
+.btn-view:hover {
+    background-color: var(--secondary-color);
+}
+
+.btn-history:hover {
+    background-color: #F59E0B;
+}
+
+.version-badge {
+    background-color: var(--light-bg);
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-gray);
+}
+
+.badge-warning {
+    background-color: #FEF3C7;
+    color: #92400E;
+}
+
+.badge-info {
+    background-color: #DBEAFE;
+    color: #1E40AF;
+}
+
+.badge-secondary {
+    background-color: #F3F4F6;
+    color: #6B7280;
+}
+
+.observation-row {
+    background-color: #FEF3C7;
+}
+
+.observation-box {
+    padding: 1rem;
+    background-color: #FFFBEB;
+    border-left: 4px solid #F59E0B;
+    margin: 0.5rem 0;
+}
+
+.observation-box i {
+    color: #F59E0B;
+    margin-right: 0.5rem;
+}
+
+.observation-box p {
+    margin: 0.5rem 0 0 1.5rem;
+    color: var(--text-dark);
+}
+
+.status-legend {
+    margin-top: 2rem;
+    padding: 1.5rem;
+    background-color: var(--white);
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.status-legend h3 {
+    font-size: 1.125rem;
+    color: var(--text-dark);
+    margin-bottom: 1rem;
+}
+
+.status-legend ul {
+    list-style: none;
+    padding: 0;
+}
+
+.status-legend li {
+    margin: 0.75rem 0;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    background-color: var(--white);
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.empty-icon {
+    font-size: 4rem;
+    color: var(--text-gray);
+    margin-bottom: 1rem;
+}
+
+.empty-state h2 {
+    font-size: 1.5rem;
+    color: var(--text-dark);
+    margin-bottom: 0.5rem;
+}
+
+.empty-state p {
+    color: var(--text-gray);
+    margin-bottom: 2rem;
+    max-width: 500px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* Estilos do Modal */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.4);
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 5% auto;
+    padding: 0;
+    border: 1px solid #888;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 600px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.modal-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h2 {
+    margin: 0;
+    font-size: 1.5rem;
+    color: #1f2937;
+}
+
+.close {
+    color: #9ca3af;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.close:hover,
+.close:focus {
+    color: #1f2937;
+}
+
+.modal-content form {
+    padding: 1.5rem;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: #374151;
+}
+
+.form-group input[type="file"],
+.form-group textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 1rem;
+}
+
+.form-group textarea {
+    resize: vertical;
+}
+
+.form-group small {
+    display: block;
+    margin-top: 0.25rem;
+    color: #6b7280;
+    font-size: 0.875rem;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+    padding-top: 1rem;
+    border-top: 1px solid #e5e7eb;
+}
+
+.modal-actions .btn {
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.modal-actions .btn-secondary {
+    background-color: #f3f4f6;
+    color: #374151;
+}
+
+.modal-actions .btn-secondary:hover {
+    background-color: #e5e7eb;
+}
+
+.modal-actions .btn-primary {
+    background-color: #4f46e5;
+    color: white;
+}
+
+.modal-actions .btn-primary:hover {
+    background-color: #4338ca;
+}
+
+@media (max-width: 768px) {
+    .page-header {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: flex-start;
+    }
+    
+    .page-header .btn {
+        width: 100%;
+    }
+    
+    .action-buttons {
+        flex-direction: column;
+    }
+}
+</style>
+
+<!-- Modal de Reenvio -->
+<div id="reenvioModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Reenviar Documento</h2>
+            <span class="close" onclick="closeReenvioModal()">&times;</span>
+        </div>
+        <form id="reenvioForm" method="post" action="" enctype="multipart/form-data">
+            {% csrf_token %}
+            <input type="hidden" id="documento_id" name="documento_id">
+            <div class="form-group">
+                <label>Tipo de Documento: <span id="tipo_documento"></span></label>
+            </div>
+            <div class="form-group">
+                <label for="arquivo">Novo Arquivo *</label>
+                <input type="file" id="arquivo" name="arquivo" accept=".pdf,.doc,.docx" required>
+                <small>Formatos aceitos: PDF, DOC, DOCX (máx. 10MB)</small>
+            </div>
+            <div class="form-group">
+                <label for="observacoes">Observações sobre as correções</label>
+                <textarea id="observacoes" name="observacoes" rows="4" placeholder="Descreva as alterações realizadas..."></textarea>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeReenvioModal()">Cancelar</button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-upload"></i> Reenviar Documento
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openReenvioModal(documentoId, tipo) {
+    console.log('[DEBUG] openReenvioModal chamada - documentoId:', documentoId, 'tipo:', tipo);
+    document.getElementById('documento_id').value = documentoId;
+    document.getElementById('tipo_documento').textContent = tipo;
+    const actionUrl = '/estagio/documentos/' + documentoId + '/reenviar/';
+    document.getElementById('reenvioForm').action = actionUrl;
+    console.log('[DEBUG] Action URL definida:', actionUrl);
+    console.log('[DEBUG] Form action atual:', document.getElementById('reenvioForm').action);
+    document.getElementById('reenvioModal').style.display = 'block';
+}
+
+function closeReenvioModal() {
+    document.getElementById('reenvioModal').style.display = 'none';
+    document.getElementById('reenvioForm').reset();
+}
+
+window.onclick = function(event) {
+    const modal = document.getElementById('reenvioModal');
+    if (event.target == modal) {
+        closeReenvioModal();
+    }
+}
+
+// Adicionar validação e feedback no envio
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('reenvioForm');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            const arquivo = document.getElementById('arquivo').files[0];
+            
+            if (!arquivo) {
+                e.preventDefault();
+                alert('Por favor, selecione um arquivo.');
+                return false;
+            }
+            
+            // Validar tamanho (10MB)
+            if (arquivo.size > 10 * 1024 * 1024) {
+                e.preventDefault();
+                alert('O arquivo não pode ser maior que 10MB.');
+                return false;
+            }
+            
+            // Validar extensão
+            const extensao = arquivo.name.split('.').pop().toLowerCase();
+            if (!['pdf', 'doc', 'docx'].includes(extensao)) {
+                e.preventDefault();
+                alert('Formato inválido. Use PDF, DOC ou DOCX.');
+                return false;
+            }
+            
+            // Mostrar feedback de envio
+            const submitBtn = this.querySelector('button[type="submit"]');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+            
+            // Permitir envio do formulário
+            return true;
+        });
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,260 @@
+{% extends 'base.html' %}
+
+{% block title %}Acompanhar Estágios - SAGE{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <h1>Meus Estágios</h1>
+        <a href="{% url 'solicitar_estagio' %}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Nova Solicitação
+        </a>
+    </div>
+
+    {% if estagios %}
+    
+    <!-- Dashboard de Estatísticas dos Documentos -->
+    {% if stats.total > 0 %}
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+        <div class="stat-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <i class="fas fa-file-alt" style="font-size: 2rem; opacity: 0.9;"></i>
+                <div>
+                    <div style="font-size: 2rem; font-weight: bold;">{{ stats.total }}</div>
+                    <div style="font-size: 0.875rem; opacity: 0.9;">Total de Documentos</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="stat-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <i class="fas fa-clock" style="font-size: 2rem; opacity: 0.9;"></i>
+                <div>
+                    <div style="font-size: 2rem; font-weight: bold;">{{ stats.enviados }}</div>
+                    <div style="font-size: 0.875rem; opacity: 0.9;">Aguardando Análise</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="stat-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <i class="fas fa-check" style="font-size: 2rem; opacity: 0.9;"></i>
+                <div>
+                    <div style="font-size: 2rem; font-weight: bold;">{{ stats.aprovados_supervisor }}</div>
+                    <div style="font-size: 0.875rem; opacity: 0.9;">Aprovados (Supervisor)</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="stat-card" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <i class="fas fa-check-double" style="font-size: 2rem; opacity: 0.9;"></i>
+                <div>
+                    <div style="font-size: 2rem; font-weight: bold;">{{ stats.finalizados }}</div>
+                    <div style="font-size: 0.875rem; opacity: 0.9;">Finalizados</div>
+                </div>
+            </div>
+        </div>
+        
+        {% if stats.ajustes > 0 %}
+        <div class="stat-card" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <i class="fas fa-exclamation-triangle" style="font-size: 2rem; opacity: 0.9;"></i>
+                <div>
+                    <div style="font-size: 2rem; font-weight: bold;">{{ stats.ajustes }}</div>
+                    <div style="font-size: 0.875rem; opacity: 0.9;">Precisam de Ajustes</div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if stats.reprovados > 0 %}
+        <div class="stat-card" style="background: linear-gradient(135deg, #d53369 0%, #daae51 100%); color: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <i class="fas fa-times-circle" style="font-size: 2rem; opacity: 0.9;"></i>
+                <div>
+                    <div style="font-size: 2rem; font-weight: bold;">{{ stats.reprovados }}</div>
+                    <div style="font-size: 0.875rem; opacity: 0.9;">Reprovados</div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+    
+    <div class="card">
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Título</th>
+                        <th>Empresa</th>
+                        <th>Supervisor</th>
+                        <th>Data de Envio</th>
+                        <th>Status</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for estagio in estagios %}
+                    <tr>
+                        <td>
+                            <strong>{{ estagio.titulo }}</strong>
+                        </td>
+                        <td>{{ estagio.empresa.razao_social }}</td>
+                        <td>{{ estagio.supervisor.nome }}</td>
+                        <td>
+                            {{ estagio.data_inicio|date:"d/m/Y" }}
+                        </td>
+                        <td>
+                            {% if estagio.status == 'analise' %}
+                                <span class="badge badge-pending">
+                                    <i class="fas fa-clock"></i> Em Análise
+                                </span>
+                            {% elif estagio.status == 'aprovado' %}
+                                <span class="badge badge-approved">
+                                    <i class="fas fa-check-circle"></i> Aprovado
+                                </span>
+                            {% elif estagio.status == 'reprovado' %}
+                                <span class="badge badge-rejected">
+                                    <i class="fas fa-times-circle"></i> Reprovado
+                                </span>
+                            {% else %}
+                                <span class="badge">{{ estagio.get_status_display }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{% url 'estagio_detalhe' estagio.id %}" class="btn-icon" title="Ver detalhes">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Status Messages -->
+    <div class="status-messages">
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle"></i>
+            <strong>Status das solicitações:</strong>
+            <ul>
+                <li><strong>Em Análise:</strong> Sua solicitação está em análise.</li>
+                <li><strong>Aprovado:</strong> Sua solicitação foi aprovada.</li>
+                <li><strong>Reprovado:</strong> Sua solicitação foi reprovada.</li>
+            </ul>
+        </div>
+    </div>
+
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-icon">
+            <i class="fas fa-inbox"></i>
+        </div>
+        <h2>Nenhum estágio cadastrado</h2>
+        <p>Você ainda não possui solicitações de estágio. Clique no botão abaixo para criar sua primeira solicitação.</p>
+        <a href="{% url 'solicitar_estagio' %}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Solicitar Estágio
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.page-container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.page-header h1 {
+    font-size: 1.875rem;
+    font-weight: 700;
+    color: var(--text-dark);
+}
+
+.btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 6px;
+    background-color: var(--light-bg);
+    color: var(--text-gray);
+    transition: all 0.3s;
+    text-decoration: none;
+}
+
+.btn-icon:hover {
+    background-color: var(--primary-color);
+    color: var(--white);
+}
+
+.status-messages {
+    margin-top: 2rem;
+}
+
+.status-messages .alert {
+    background-color: #EFF6FF;
+    border: 1px solid #BFDBFE;
+    color: #1E40AF;
+}
+
+.status-messages ul {
+    margin: 1rem 0 0 1.5rem;
+}
+
+.status-messages li {
+    margin: 0.5rem 0;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    background-color: var(--white);
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.empty-icon {
+    font-size: 4rem;
+    color: var(--text-gray);
+    margin-bottom: 1rem;
+}
+
+.empty-state h2 {
+    font-size: 1.5rem;
+    color: var(--text-dark);
+    margin-bottom: 0.5rem;
+}
+
+.empty-state p {
+    color: var(--text-gray);
+    margin-bottom: 2rem;
+    max-width: 500px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+@media (max-width: 768px) {
+    .page-header {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: flex-start;
+    }
+    
+    .page-header .btn {
+        width: 100%;
+    }
+}
+</style>
+{% endblock %}

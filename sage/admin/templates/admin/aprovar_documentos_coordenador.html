@@ -1,0 +1,492 @@
+{% extends 'base.html' %}
+
+{% block title %}Aprovar Documentos - Coordenador - SAGE{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <h1>Aprovação Final de Documentos</h1>
+        <div class="header-info">
+            <span class="badge badge-info">
+                <i class="fas fa-user-tie"></i> Coordenador: {{ coordenador.usuario.nome }}
+            </span>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="filters-card">
+        <form method="get" class="filters-form">
+            <div class="filter-group">
+                <label for="status">Status:</label>
+                <select name="status" id="status" class="form-select">
+                    <option value="">Todos</option>
+                    <option value="aprovado" {% if request.GET.status == 'aprovado' %}selected{% endif %}>Aguardando Aprovação</option>
+                    <option value="finalizado" {% if request.GET.status == 'finalizado' %}selected{% endif %}>Finalizados</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="tipo">Tipo de Documento:</label>
+                <select name="tipo" id="tipo" class="form-select">
+                    <option value="">Todos</option>
+                    <option value="TCE" {% if request.GET.tipo == 'TCE' %}selected{% endif %}>TCE</option>
+                    <option value="plano_atividades" {% if request.GET.tipo == 'plano_atividades' %}selected{% endif %}>Plano de Atividades</option>
+                    <option value="relatorio_parcial" {% if request.GET.tipo == 'relatorio_parcial' %}selected{% endif %}>Relatório Parcial</option>
+                    <option value="relatorio_final" {% if request.GET.tipo == 'relatorio_final' %}selected{% endif %}>Relatório Final</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-secondary">
+                <i class="fas fa-filter"></i> Filtrar
+            </button>
+        </form>
+    </div>
+
+    <!-- Estatísticas -->
+    <div class="stats-grid">
+        <div class="stat-card stat-pending">
+            <div class="stat-icon">
+                <i class="fas fa-hourglass-half"></i>
+            </div>
+            <div class="stat-content">
+                <h3>{{ stats.aguardando }}</h3>
+                <p>Aguardando Aprovação</p>
+            </div>
+        </div>
+        <div class="stat-card stat-approved">
+            <div class="stat-icon">
+                <i class="fas fa-check-double"></i>
+            </div>
+            <div class="stat-content">
+                <h3>{{ stats.finalizados }}</h3>
+                <p>Finalizados</p>
+            </div>
+        </div>
+        <div class="stat-card stat-total">
+            <div class="stat-icon">
+                <i class="fas fa-file-alt"></i>
+            </div>
+            <div class="stat-content">
+                <h3>{{ stats.total }}</h3>
+                <p>Total</p>
+            </div>
+        </div>
+    </div>
+
+    {% if documentos %}
+    <div class="card">
+        <div class="card-header-info">
+            <h2><i class="fas fa-clipboard-check"></i> Documentos{% if request.GET.status == 'finalizado' %} Finalizados{% else %} para Aprovação Final{% endif %}</h2>
+            <p class="text-muted">
+                {% if request.GET.status == 'finalizado' %}
+                    Documentos que foram aprovados pelo supervisor e pelo coordenador.
+                {% else %}
+                    Documentos já validados pelo supervisor aguardando sua aprovação final.
+                {% endif %}
+            </p>
+        </div>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Aluno</th>
+                        <th>Empresa</th>
+                        <th>Supervisor</th>
+                        <th>Documento</th>
+                        <th>Tipo</th>
+                        <th>Data de Envio</th>
+                        <th>Status</th>
+                        <th>Versão</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for documento in documentos %}
+                    <tr>
+                        <td>
+                            <div class="student-info">
+                                <i class="fas fa-user-graduate"></i>
+                                <div>
+                                    {% if documento.enviado_por %}
+                                        {% with aluno=documento.enviado_por.aluno %}
+                                            <strong>{{ aluno.nome }}</strong>
+                                            <small>{{ aluno.matricula }}</small>
+                                        {% endwith %}
+                                    {% else %}
+                                        <strong>-</strong>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </td>
+                        <td>{{ documento.estagio.empresa.razao_social }}</td>
+                        <td>
+                            <div class="supervisor-info">
+                                <i class="fas fa-user-tie"></i>
+                                {{ documento.estagio.supervisor.nome }}
+                            </div>
+                        </td>
+                        <td>
+                            <i class="fas fa-file-pdf"></i>
+                            {{ documento.nome_arquivo }}
+                        </td>
+                        <td>
+                            <span class="badge badge-info">{{ documento.tipo }}</span>
+                        </td>
+                        <td>{{ documento.created_at|date:"d/m/Y H:i" }}</td>
+                        <td>
+                            {% if documento.status == 'aprovado' %}
+                                <span class="badge badge-approved">
+                                    <i class="fas fa-check-circle"></i> Aprovado
+                                </span>
+                            {% elif documento.status == 'finalizado' %}
+                                <span class="badge" style="background-color: #10b981; color: white; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.875rem;">
+                                    <i class="fas fa-check-double"></i> Finalizado
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="version-badge">v{{ documento.versao }}</span>
+                        </td>
+                        <td>
+                            <div class="action-buttons">
+                                <a href="{{ documento.arquivo.url }}" target="_blank" class="btn-icon btn-view" title="Visualizar">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                {% if documento.status == 'aprovado' %}
+                                <button type="button" class="btn-icon btn-approve" onclick="openApprovalModal({{ documento.id }}, '{{ documento.nome_arquivo }}')" title="Aprovar">
+                                    <i class="fas fa-check-double"></i>
+                                </button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% if documento.aprovado_por %}
+                    <tr class="info-row">
+                        <td colspan="9">
+                            <div class="approval-info">
+                                <i class="fas fa-info-circle"></i>
+                                <strong>Aprovado pelo supervisor:</strong>
+                                {{ documento.aprovado_por.username }}{% if documento.data_aprovacao %} em {{ documento.data_aprovacao|date:"d/m/Y H:i" }}{% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% elif documento.data_aprovacao %}
+                    <tr class="info-row">
+                        <td colspan="9">
+                            <div class="approval-info">
+                                <i class="fas fa-info-circle"></i>
+                                <strong>Aprovado pelo supervisor em:</strong>
+                                {{ documento.data_aprovacao|date:"d/m/Y H:i" }}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-icon">
+            <i class="fas fa-inbox"></i>
+        </div>
+        <h2>Nenhum documento aguardando aprovação</h2>
+        <p>Não há documentos aprovados pelo supervisor aguardando sua validação final.</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Modal de Aprovação -->
+<div id="approvalModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Aprovação Final</h2>
+            <button type="button" class="close-modal" onclick="closeApprovalModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <form method="post" id="approvalForm" action="">
+            {% csrf_token %}
+            <div class="modal-body">
+                <p><strong>Documento:</strong> <span id="modalDocumentoNome"></span></p>
+                
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>Atenção:</strong> Este documento já foi aprovado pelo supervisor. Ao aprovar, ele será marcado como finalizado.
+                </div>
+
+                <p>Deseja aprovar este documento?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeApprovalModal()">Cancelar</button>
+                <button type="submit" class="btn btn-success">
+                    <i class="fas fa-check-double"></i> Aprovar Documento
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.page-container {
+    max-width: 1600px;
+    margin: 0 auto;
+}
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.header-info .badge {
+    font-size: 1rem;
+    padding: 0.5rem 1rem;
+}
+
+.filters-card {
+    background-color: var(--white);
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
+}
+
+.filters-form {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-end;
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    flex: 1;
+}
+
+.form-select {
+    padding: 0.625rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 0.9375rem;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background-color: var(--white);
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.stat-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+}
+
+.stat-pending .stat-icon {
+    background-color: #FEF3C7;
+    color: #92400E;
+}
+
+.stat-approved .stat-icon {
+    background-color: #D1FAE5;
+    color: #065F46;
+}
+
+.stat-total .stat-icon {
+    background-color: #DBEAFE;
+    color: #1E40AF;
+}
+
+.stat-content h3 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin: 0;
+}
+
+.stat-content p {
+    font-size: 0.875rem;
+    color: var(--text-gray);
+    margin: 0;
+}
+
+.card-header-info {
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.card-header-info h2 {
+    margin: 0 0 0.5rem 0;
+    color: var(--text-dark);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.student-info, .supervisor-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.student-info i {
+    color: var(--primary-color);
+}
+
+.supervisor-info i {
+    color: var(--secondary-color);
+}
+
+.student-info small {
+    display: block;
+    color: var(--text-gray);
+    font-size: 0.8125rem;
+}
+
+.info-row {
+    background-color: #EFF6FF;
+}
+
+.approval-info {
+    padding: 0.75rem;
+    background-color: #DBEAFE;
+    border-left: 4px solid #3B82F6;
+    margin: 0.5rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.approval-info i {
+    color: #1E40AF;
+}
+
+.btn-approve {
+    background-color: var(--success-color);
+    color: var(--white);
+}
+
+.btn-approve:hover {
+    background-color: #059669;
+}
+
+.alert {
+    padding: 1rem;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+}
+
+.alert-info {
+    background-color: #EFF6FF;
+    border: 1px solid #BFDBFE;
+    color: #1E40AF;
+}
+
+.alert i {
+    font-size: 1.25rem;
+}
+
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    align-items: center;
+    justify-content: center;
+}
+
+.modal.active {
+    display: flex;
+}
+
+.modal-content {
+    background-color: var(--white);
+    border-radius: 12px;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    width: 90%;
+    max-width: 500px;
+}
+
+.modal-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h2 {
+    font-size: 1.5rem;
+    color: var(--text-dark);
+    margin: 0;
+}
+
+.close-modal {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: var(--text-gray);
+    cursor: pointer;
+    padding: 0.25rem;
+}
+
+.modal-body {
+    padding: 1.5rem;
+}
+
+.modal-footer {
+    padding: 1.5rem;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+}
+</style>
+
+<script>
+let currentDocumentoId = null;
+
+function openApprovalModal(documentoId, documentoNome) {
+    currentDocumentoId = documentoId;
+    document.getElementById('modalDocumentoNome').textContent = documentoNome;
+    document.getElementById('approvalForm').action = `/coordenador/documentos/${documentoId}/aprovar/`;
+    document.getElementById('approvalModal').classList.add('active');
+}
+
+function closeApprovalModal() {
+    document.getElementById('approvalModal').classList.remove('active');
+    currentDocumentoId = null;
+}
+
+// Fechar modal ao clicar fora
+document.getElementById('approvalModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeApprovalModal();
+    }
+});
+</script>
+{% endblock %}

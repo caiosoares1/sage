@@ -1,0 +1,555 @@
+{% extends 'base.html' %}
+
+{% block title %}Aprovar Documentos - SAGE{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <h1>Aprovação de Documentos</h1>
+        <div class="header-info">
+            <span class="badge badge-info">
+                <i class="fas fa-user-tie"></i> Supervisor: {{ supervisor.nome }}
+            </span>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="filters-card">
+        <form method="get" class="filters-form">
+            <div class="filter-group">
+                <label for="status">Status:</label>
+                <select name="status" id="status" class="form-select">
+                    <option value="">Todos</option>
+                    <option value="enviado" {% if request.GET.status == 'enviado' %}selected{% endif %}>Enviado</option>
+                    <option value="corrigido" {% if request.GET.status == 'corrigido' %}selected{% endif %}>Corrigido</option>
+                    <option value="aprovado" {% if request.GET.status == 'aprovado' %}selected{% endif %}>Aprovado</option>
+                    <option value="reprovado" {% if request.GET.status == 'reprovado' %}selected{% endif %}>Reprovado</option>
+                    <option value="ajustes_solicitados" {% if request.GET.status == 'ajustes_solicitados' %}selected{% endif %}>Ajustes Solicitados</option>
+                    <option value="finalizado" {% if request.GET.status == 'finalizado' %}selected{% endif %}>Finalizado</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="tipo">Tipo:</label>
+                <select name="tipo" id="tipo" class="form-select">
+                    <option value="">Todos</option>
+                    <option value="TCE" {% if request.GET.tipo == 'TCE' %}selected{% endif %}>TCE</option>
+                    <option value="plano_atividades" {% if request.GET.tipo == 'plano_atividades' %}selected{% endif %}>Plano de Atividades</option>
+                    <option value="relatorio_parcial" {% if request.GET.tipo == 'relatorio_parcial' %}selected{% endif %}>Relatório Parcial</option>
+                    <option value="relatorio_final" {% if request.GET.tipo == 'relatorio_final' %}selected{% endif %}>Relatório Final</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-secondary">
+                <i class="fas fa-filter"></i> Filtrar
+            </button>
+        </form>
+    </div>
+
+    <!-- Estatísticas -->
+    <div class="stats-grid">
+        <div class="stat-card stat-pending">
+            <div class="stat-icon">
+                <i class="fas fa-clock"></i>
+            </div>
+            <div class="stat-content">
+                <h3>{{ stats.pendentes }}</h3>
+                <p>Pendentes</p>
+            </div>
+        </div>
+        <div class="stat-card stat-approved">
+            <div class="stat-icon">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="stat-content">
+                <h3>{{ stats.aprovados }}</h3>
+                <p>Aprovados</p>
+            </div>
+        </div>
+        <div class="stat-card stat-rejected">
+            <div class="stat-icon">
+                <i class="fas fa-times-circle"></i>
+            </div>
+            <div class="stat-content">
+                <h3>{{ stats.reprovados }}</h3>
+                <p>Reprovados</p>
+            </div>
+        </div>
+        <div class="stat-card stat-total">
+            <div class="stat-icon">
+                <i class="fas fa-file-alt"></i>
+            </div>
+            <div class="stat-content">
+                <h3>{{ stats.total }}</h3>
+                <p>Total</p>
+            </div>
+        </div>
+    </div>
+
+    {% if documentos %}
+    <div class="card">
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Aluno</th>
+                        <th>Documento</th>
+                        <th>Tipo</th>
+                        <th>Data de Envio</th>
+                        <th>Status</th>
+                        <th>Versão</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for documento in documentos %}
+                    <tr>
+                        <td>
+                            <div class="student-info">
+                                <i class="fas fa-user-graduate"></i>
+                                <div>
+                                    {% if documento.enviado_por %}
+                                        {% with aluno=documento.enviado_por.aluno %}
+                                            <strong>{{ aluno.nome }}</strong>
+                                            <small>{{ aluno.matricula }}</small>
+                                        {% endwith %}
+                                    {% else %}
+                                        <strong>-</strong>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <i class="fas fa-file-pdf"></i>
+                            {{ documento.nome_arquivo }}
+                        </td>
+                        <td>
+                            <span class="badge badge-info">{{ documento.tipo }}</span>
+                        </td>
+                        <td>{{ documento.created_at|date:"d/m/Y H:i" }}</td>
+                        <td>
+                            {% if documento.status == 'enviado' %}
+                                <span class="badge badge-pending">
+                                    <i class="fas fa-clock"></i> Enviado
+                                </span>
+                            {% elif documento.status == 'ajustes_solicitados' %}
+                                <span class="badge badge-warning">
+                                    <i class="fas fa-exclamation-triangle"></i> Ajustes Solicitados
+                                </span>
+                            {% elif documento.status == 'corrigido' %}
+                                <span class="badge badge-info">
+                                    <i class="fas fa-edit"></i> Corrigido
+                                </span>
+                            {% elif documento.status == 'aprovado' %}
+                                <span class="badge badge-approved">
+                                    <i class="fas fa-check-circle"></i> Aprovado
+                                </span>
+                            {% elif documento.status == 'reprovado' %}
+                                <span class="badge badge-rejected">
+                                    <i class="fas fa-times-circle"></i> Reprovado
+                                </span>
+                            {% elif documento.status == 'finalizado' %}
+                                <span class="badge badge-approved">
+                                    <i class="fas fa-check-circle"></i> Aprovado
+                                </span>
+                            {% else %}
+                                <span class="badge badge-info">
+                                    <i class="fas fa-question-circle"></i> {{ documento.status|title }}
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="version-badge">v{{ documento.versao }}</span>
+                        </td>
+                        <td>
+                            <div class="action-buttons">
+                                <a href="{% url 'supervisor:visualizar_documento' documento.id %}" class="btn-icon btn-view" title="Visualizar">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                {% if documento.status in 'enviado,corrigido' %}
+                                <button type="button" class="btn-icon btn-approve" onclick="openApprovalModal({{ documento.id }}, '{{ documento.nome_arquivo }}')" title="Aprovar/Reprovar">
+                                    <i class="fas fa-check"></i>
+                                </button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% if documento.observacoes_supervisor %}
+                    <tr class="observation-row">
+                        <td colspan="7">
+                            <div class="observation-box">
+                                <i class="fas fa-comment-alt"></i>
+                                <strong>Observações:</strong>
+                                <p>{{ documento.observacoes_supervisor }}</p>
+                                {% if documento.aprovado_por %}
+                                <small>Por: {{ documento.aprovado_por.username }} em {{ documento.data_aprovacao|date:"d/m/Y H:i" }}</small>
+                                {% elif documento.data_aprovacao %}
+                                <small>Em {{ documento.data_aprovacao|date:"d/m/Y H:i" }}</small>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-icon">
+            <i class="fas fa-inbox"></i>
+        </div>
+        <h2>Nenhum documento para análise</h2>
+        <p>Não há documentos pendentes de aprovação no momento.</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Modal de Aprovação/Reprovação -->
+<div id="approvalModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Avaliar Documento</h2>
+            <button type="button" class="close-modal" onclick="closeApprovalModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <form method="post" id="approvalForm" action="">
+            {% csrf_token %}
+            <div class="modal-body">
+                <p><strong>Documento:</strong> <span id="modalDocumentoNome"></span></p>
+                
+                <div class="form-group">
+                    <label for="acao">Ação:</label>
+                    <div class="radio-group">
+                        <label class="radio-label radio-approve">
+                            <input type="radio" name="acao" value="aprovar" required onchange="toggleObservacoes()">
+                            <i class="fas fa-check-circle"></i> Aprovar
+                        </label>
+                        <label class="radio-label radio-reject">
+                            <input type="radio" name="acao" value="reprovar" required onchange="toggleObservacoes()">
+                            <i class="fas fa-times-circle"></i> Reprovar
+                        </label>
+                        <label class="radio-label radio-adjust">
+                            <input type="radio" name="acao" value="solicitar_ajustes" required onchange="toggleObservacoes()">
+                            <i class="fas fa-exclamation-triangle"></i> Solicitar Ajustes
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group" id="observacoesGroup" style="display: none;">
+                    <label for="observacoes">Observações <span class="required">*</span></label>
+                    <textarea name="observacoes" id="observacoes" rows="5" class="form-textarea" placeholder="Descreva os ajustes necessários ou o motivo da reprovação..."></textarea>
+                    <small class="help-text">Obrigatório ao reprovar ou solicitar ajustes</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeApprovalModal()">Cancelar</button>
+                <button type="submit" class="btn btn-primary">Confirmar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.page-container {
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.header-info .badge {
+    font-size: 1rem;
+    padding: 0.5rem 1rem;
+}
+
+.filters-card {
+    background-color: var(--white);
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
+}
+
+.filters-form {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-end;
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    flex: 1;
+}
+
+.form-select {
+    padding: 0.625rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 0.9375rem;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background-color: var(--white);
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.stat-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+}
+
+.stat-pending .stat-icon {
+    background-color: #FEF3C7;
+    color: #92400E;
+}
+
+.stat-approved .stat-icon {
+    background-color: #D1FAE5;
+    color: #065F46;
+}
+
+.stat-rejected .stat-icon {
+    background-color: #FEE2E2;
+    color: #991B1B;
+}
+
+.stat-total .stat-icon {
+    background-color: #DBEAFE;
+    color: #1E40AF;
+}
+
+.stat-content h3 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin: 0;
+}
+
+.stat-content p {
+    font-size: 0.875rem;
+    color: var(--text-gray);
+    margin: 0;
+}
+
+.student-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.student-info i {
+    color: var(--primary-color);
+}
+
+.student-info small {
+    display: block;
+    color: var(--text-gray);
+    font-size: 0.8125rem;
+}
+
+.btn-approve {
+    background-color: var(--success-color);
+    color: var(--white);
+}
+
+.btn-approve:hover {
+    background-color: #059669;
+}
+
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    align-items: center;
+    justify-content: center;
+}
+
+.modal.active {
+    display: flex;
+}
+
+.modal-content {
+    background-color: var(--white);
+    border-radius: 12px;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    width: 90%;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.modal-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h2 {
+    font-size: 1.5rem;
+    color: var(--text-dark);
+    margin: 0;
+}
+
+.close-modal {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: var(--text-gray);
+    cursor: pointer;
+    padding: 0.25rem;
+}
+
+.modal-body {
+    padding: 1.5rem;
+}
+
+.radio-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.radio-label {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.radio-label:hover {
+    border-color: var(--primary-color);
+    background-color: var(--light-bg);
+}
+
+.radio-label input[type="radio"] {
+    width: 18px;
+    height: 18px;
+}
+
+.radio-label input[type="radio"]:checked + i {
+    color: var(--primary-color);
+}
+
+.radio-approve:has(input:checked) {
+    border-color: var(--success-color);
+    background-color: #D1FAE5;
+}
+
+.radio-reject:has(input:checked) {
+    border-color: var(--danger-color);
+    background-color: #FEE2E2;
+}
+
+.radio-adjust:has(input:checked) {
+    border-color: #F59E0B;
+    background-color: #FEF3C7;
+}
+
+.form-textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 0.9375rem;
+    resize: vertical;
+}
+
+.modal-footer {
+    padding: 1.5rem;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+}
+
+.required {
+    color: var(--danger-color);
+}
+
+@media (max-width: 768px) {
+    .filters-form {
+        flex-direction: column;
+    }
+    
+    .filters-form .btn {
+        width: 100%;
+    }
+}
+</style>
+
+<script>
+let currentDocumentoId = null;
+
+function openApprovalModal(documentoId, documentoNome) {
+    currentDocumentoId = documentoId;
+    document.getElementById('modalDocumentoNome').textContent = documentoNome;
+    document.getElementById('approvalForm').action = `/supervisor/documentos/${documentoId}/avaliar/`;
+    document.getElementById('approvalModal').classList.add('active');
+}
+
+function closeApprovalModal() {
+    document.getElementById('approvalModal').classList.remove('active');
+    document.getElementById('approvalForm').reset();
+    document.getElementById('observacoesGroup').style.display = 'none';
+    currentDocumentoId = null;
+}
+
+function toggleObservacoes() {
+    const acao = document.querySelector('input[name="acao"]:checked').value;
+    const observacoesGroup = document.getElementById('observacoesGroup');
+    const observacoesField = document.getElementById('observacoes');
+    
+    if (acao === 'reprovar' || acao === 'solicitar_ajustes') {
+        observacoesGroup.style.display = 'block';
+        observacoesField.required = true;
+    } else {
+        observacoesGroup.style.display = 'none';
+        observacoesField.required = false;
+    }
+}
+
+// Fechar modal ao clicar fora
+document.getElementById('approvalModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeApprovalModal();
+    }
+});
+</script>
+{% endblock %}

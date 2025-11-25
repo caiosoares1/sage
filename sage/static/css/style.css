@@ -439,3 +439,80 @@ table tr:last-child td {
         padding: 0 1rem;
     }
 }
+
+/* Estilos dos botões de ação */
+.btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    font-size: 1rem;
+}
+
+.btn-view {
+    background-color: #3B82F6;
+    color: white;
+}
+
+.btn-view:hover {
+    background-color: #2563EB;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.btn-download {
+    background-color: #10B981;
+    color: white;
+}
+
+.btn-download:hover {
+    background-color: #059669;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+.btn-history {
+    background-color: #8B5CF6;
+    color: white;
+}
+
+.btn-history:hover {
+    background-color: #7C3AED;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+}
+
+.btn-approve {
+    background-color: #10B981;
+    color: white;
+}
+
+.btn-approve:hover {
+    background-color: #059669;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+.btn-upload {
+    background-color: #3B82F6;
+    color: white;
+}
+
+.btn-upload:hover {
+    background-color: #2563EB;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.action-buttons {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    justify-content: center;
+}
