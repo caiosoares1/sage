@@ -1,7 +1,10 @@
+# Formulário para seleção/pesquisa de aluno para supervisor
+from django import forms
+from estagio.models import Aluno
 from django import forms
 from django.core.exceptions import ValidationError
 from datetime import date
-from .models import Estagio, Documento
+from .models import Estagio, Documento, Aluno, HorasCumpridas
 from admin.models import CursoCoordenador
 
 class EstagioForm(forms.ModelForm):
@@ -116,3 +119,81 @@ class DocumentoForm(forms.ModelForm):
         if not coordenador:
             raise ValidationError('Selecione um coordenador.')
         return coordenador
+
+
+class AlunoCadastroForm(forms.ModelForm):
+    class Meta:
+        model = Aluno
+        fields = ['nome', 'contato', 'matricula', 'instituicao']
+        widgets = {
+            'nome': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nome completo'}),
+            'contato': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'E-mail'}),
+            'matricula': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Matrícula'}),
+            'instituicao': forms.Select(attrs={'class': 'form-control'}),
+        }
+
+    def clean_nome(self):
+        nome = self.cleaned_data.get('nome', '')
+        if not nome:
+            raise forms.ValidationError('O campo Nome é obrigatório.')
+        if not re.match(r'^[A-Za-zÀ-ÿ\s]+$', nome):
+            raise forms.ValidationError('O nome deve conter apenas letras.')
+        return nome
+
+    def clean_contato(self):
+        contato = self.cleaned_data.get('contato', '')
+        if not contato:
+            raise forms.ValidationError('O campo E-mail é obrigatório.')
+        # Django já valida formato de email
+        return contato
+
+    def clean_matricula(self):
+        matricula = self.cleaned_data.get('matricula', '')
+        if not matricula:
+            raise forms.ValidationError('O campo Matrícula é obrigatório.')
+        if not matricula.isdigit():
+            raise forms.ValidationError('A matrícula deve conter apenas números.')
+        if Aluno.objects.filter(matricula=matricula).exists():
+            raise forms.ValidationError('Esta matrícula já está cadastrada.')
+        return matricula
+
+class HorasCumpridasForm(forms.ModelForm):
+    class Meta:
+        model = HorasCumpridas
+        fields = ['data', 'quantidade', 'descricao']
+        widgets = {
+            'data': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'quantidade': forms.NumberInput(attrs={'class': 'form-control', 'min': '1'}),
+            'descricao': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Descrição das atividades'})
+        }
+
+    def clean_data(self):
+        data = self.cleaned_data.get('data')
+        if not data:
+            raise forms.ValidationError('O campo data é obrigatório.')
+        from datetime import date as dtdate
+        if data > dtdate.today():
+            raise forms.ValidationError('Não é permitido cadastrar horas em data futura.')
+        return data
+
+    def clean_quantidade(self):
+        quantidade = self.cleaned_data.get('quantidade')
+        if quantidade is None:
+            raise forms.ValidationError('O campo quantidade de horas é obrigatório.')
+        if not isinstance(quantidade, int) or quantidade <= 0:
+            raise forms.ValidationError('A quantidade de horas deve ser numérica e maior que zero.')
+        return quantidade
+
+    def clean_descricao(self):
+        descricao = self.cleaned_data.get('descricao', '').strip()
+        if not descricao:
+            raise forms.ValidationError('O campo descrição é obrigatório.')
+        return descricao
+    
+
+
+class SupervisorAlunoSelectForm(forms.Form):
+    aluno = forms.ModelChoiceField(queryset=None, label="Selecione o aluno", required=True)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['aluno'].queryset = Aluno.objects.select_related('usuario', 'instituicao').all()

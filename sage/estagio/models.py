@@ -1,3 +1,6 @@
+# Notificação para registro de alertas enviados
+from django.db import models
+from django.utils import timezone
 from django.db import models
 from admin.models import Instituicao
 from users.models import Usuario
@@ -141,5 +144,27 @@ class DocumentoHistorico(models.Model):
     
     def __str__(self):
         return f"{self.get_acao_display()} - {self.documento.nome_arquivo} - {self.data_hora}"
+
+class HorasCumpridas(models.Model):
+    aluno = models.ForeignKey(Aluno, on_delete=models.CASCADE, related_name='horas')
+    data = models.DateField()
+    quantidade = models.PositiveIntegerField()
+    descricao = models.CharField(max_length=255)
+
+    def __str__(self):
+        return f"{self.data} - {self.quantidade}h"
+    
+class Notificacao(models.Model):
+    destinatario = models.CharField(max_length=255)
+    assunto = models.CharField(max_length=255)
+    mensagem = models.TextField()
+    data_envio = models.DateTimeField(default=timezone.now)
+    referencia = models.CharField(max_length=255, blank=True, null=True)  # Ex: documento_id ou outro identificador
+
+    class Meta:
+        unique_together = ('destinatario', 'assunto', 'referencia')  # Impede duplicidade
+
+    def __str__(self):
+        return f"Notificação para {self.destinatario} - {self.assunto} ({self.data_envio})"
 
 
