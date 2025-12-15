@@ -1033,3 +1033,65 @@ def api_verificar_prazos(request):
         ]
     })
 
+
+@login_required
+@aluno_required
+def listar_feedbacks(request):
+    """View para listar os feedbacks recebidos do supervisor pelo aluno logado
+    Task 20939 - Criar tela de listagem de feedbacks
+    Task 20940 - Exibir data, conteúdo e nome do supervisor
+    Task 20943 - Exibir mensagem quando não houver feedbacks
+    """
+    from .models import FeedbackSupervisor
+    
+    try:
+        usuario = Usuario.objects.get(id=request.user.id)
+        aluno = Aluno.objects.get(usuario=usuario)
+        
+        # Busca feedbacks do aluno ordenados por data (mais recente primeiro)
+        feedbacks = FeedbackSupervisor.objects.filter(
+            aluno=aluno
+        ).select_related('supervisor', 'estagio').order_by('-data_feedback')
+        
+    except (Usuario.DoesNotExist, Aluno.DoesNotExist):
+        feedbacks = []
+    
+    return render(request, 'estagio/listar_feedbacks.html', {'feedbacks': feedbacks})
+
+
+@login_required
+@aluno_required
+def consultar_horas(request):
+    """View para o aluno consultar suas horas de estágio
+    Task 20926 - Criar tela de consulta de carga horária
+    Task 20928 - Listar horas registradas (data, quantidade e descrição)
+    Task 20929 - Exibir mensagem quando não houver horas cadastradas
+    """
+    try:
+        usuario = Usuario.objects.get(id=request.user.id)
+        aluno = Aluno.objects.get(usuario=usuario)
+        
+        # Busca horas do aluno ordenadas por data (mais recente primeiro)
+        horas_list = HorasCumpridas.objects.filter(aluno=aluno).order_by('-data')
+        total_horas = horas_list.aggregate(total=Sum('quantidade'))['total'] or 0
+        
+        # Calcula horas obrigatórias e pendentes
+        if aluno.estagio and aluno.estagio.carga_horaria:
+            horas_obrigatorias = aluno.estagio.carga_horaria
+        else:
+            horas_obrigatorias = 100  # fallback padrão
+        
+        horas_pendentes = max(horas_obrigatorias - total_horas, 0)
+        
+    except (Usuario.DoesNotExist, Aluno.DoesNotExist):
+        horas_list = []
+        total_horas = 0
+        horas_obrigatorias = 100
+        horas_pendentes = 100
+    
+    return render(request, 'estagio/consultar_horas.html', {
+        'horas_list': horas_list,
+        'total_horas': total_horas,
+        'horas_obrigatorias': horas_obrigatorias,
+        'horas_pendentes': horas_pendentes
+    })

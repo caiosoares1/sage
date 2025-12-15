@@ -1,9 +1,9 @@
 # Formulário para seleção/pesquisa de aluno para supervisor
-from django import forms
-from estagio.models import Aluno
+import re
 from django import forms
 from django.core.exceptions import ValidationError
 from datetime import date
+from estagio.models import Aluno
 from .models import Estagio, Documento, Aluno, HorasCumpridas
 from admin.models import CursoCoordenador
 

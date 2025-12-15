@@ -37,8 +37,13 @@
                 </thead>
                 <tbody>
                     {% for documento in documentos %}
-                    <tr>
+                    <tr class="{% if documento.status == 'reprovado' %}row-rejected{% elif documento.status == 'ajustes_solicitados' %}row-warning{% endif %}">
                         <td>
+                            {% if documento.status == 'reprovado' %}
+                            <span class="status-indicator indicator-rejected"></span>
+                            {% elif documento.status == 'ajustes_solicitados' %}
+                            <span class="status-indicator indicator-warning"></span>
+                            {% endif %}
                             <i class="fas fa-file-pdf"></i>
                             <strong>{{ documento.nome_arquivo }}</strong>
                         </td>
@@ -201,6 +206,72 @@
 
 .btn-history:hover {
     background-color: #F59E0B;
+}
+
+/* Task 20909 - Destaque visual para documentos reprovados/ajustes */
+.row-rejected {
+    background: linear-gradient(to right, #FEE2E2, transparent) !important;
+    border-left: 4px solid #DC2626;
+    animation: pulse-rejected 2s ease-in-out infinite;
+}
+
+.row-warning {
+    background: linear-gradient(to right, #FEF3C7, transparent) !important;
+    border-left: 4px solid #F59E0B;
+    animation: pulse-warning 2s ease-in-out infinite;
+}
+
+@keyframes pulse-rejected {
+    0%, 100% { background-color: rgba(254, 226, 226, 0.5); }
+    50% { background-color: rgba(254, 226, 226, 1); }
+}
+
+@keyframes pulse-warning {
+    0%, 100% { background-color: rgba(254, 243, 199, 0.5); }
+    50% { background-color: rgba(254, 243, 199, 1); }
+}
+
+.status-indicator {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 0.5rem;
+    animation: blink 1.5s ease-in-out infinite;
+}
+
+.indicator-rejected {
+    background-color: #DC2626;
+    box-shadow: 0 0 8px rgba(220, 38, 38, 0.6);
+}
+
+.indicator-warning {
+    background-color: #F59E0B;
+    box-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
+}
+
+@keyframes blink {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(0.9); }
+}
+
+.badge-rejected {
+    background-color: #DC2626 !important;
+    color: white !important;
+    font-weight: 600;
+    animation: shake 0.5s ease-in-out;
+}
+
+.badge-warning {
+    background-color: #F59E0B !important;
+    color: white !important;
+    font-weight: 600;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-2px); }
+    75% { transform: translateX(2px); }
 }
 
 .version-badge {

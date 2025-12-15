@@ -1,0 +1,388 @@
+{% extends 'base.html' %}
+
+{% block title %}Cadastrar Horas - SAGE{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <h1><i class="fas fa-clock"></i> Cadastro de Horas de Estágio</h1>
+        <p class="page-subtitle">Registre suas horas de estágio cumpridas</p>
+    </div>
+
+    {% if messages %}
+    <div class="messages-container" style="margin-bottom: 1.5rem;">
+        {% for message in messages %}
+        <div class="alert {% if message.tags == 'success' %}alert-success{% elif message.tags == 'error' %}alert-error{% else %}alert-info{% endif %}" style="padding: 1rem; border-radius: 8px; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.75rem;">
+            {% if message.tags == 'success' %}
+                <i class="fas fa-check-circle" style="color: #059669; font-size: 1.25rem;"></i>
+                <span style="color: #065F46;">{{ message }}</span>
+            {% elif message.tags == 'error' %}
+                <i class="fas fa-exclamation-circle" style="color: #DC2626; font-size: 1.25rem;"></i>
+                <span style="color: #991B1B;">{{ message }}</span>
+            {% else %}
+                <i class="fas fa-info-circle" style="color: #2563EB; font-size: 1.25rem;"></i>
+                <span style="color: #1E40AF;">{{ message }}</span>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Cards de Resumo -->
+    <div class="stats-grid" style="margin-bottom: 2rem;">
+        <div class="stat-card stat-total">
+            <div class="stat-icon">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="stat-content">
+                <span class="stat-value">{{ total_horas }}h</span>
+                <span class="stat-label">Horas Cumpridas</span>
+            </div>
+        </div>
+        
+        <div class="stat-card stat-pending">
+            <div class="stat-icon">
+                <i class="fas fa-hourglass-half"></i>
+            </div>
+            <div class="stat-content">
+                <span class="stat-value">{{ horas_pendentes }}h</span>
+                <span class="stat-label">Horas Pendentes</span>
+            </div>
+        </div>
+        
+        <div class="stat-card stat-target">
+            <div class="stat-icon">
+                <i class="fas fa-bullseye"></i>
+            </div>
+            <div class="stat-content">
+                <span class="stat-value">{{ horas_obrigatorias }}h</span>
+                <span class="stat-label">Meta Total</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Barra de Progresso -->
+    <div class="progress-card" style="margin-bottom: 2rem;">
+        <div class="progress-header">
+            <span>Progresso das Horas</span>
+            <span class="progress-percentage">{% widthratio total_horas horas_obrigatorias 100 %}%</span>
+        </div>
+        <div class="progress-bar-container">
+            <div class="progress-bar" style="width: {% widthratio total_horas horas_obrigatorias 100 %}%;"></div>
+        </div>
+    </div>
+
+    <!-- Formulário -->
+    <div class="card form-card">
+        <div class="card-header">
+            <h2><i class="fas fa-plus-circle"></i> Registrar Novas Horas</h2>
+        </div>
+        <div class="card-body">
+            <form method="post" novalidate>
+                {% csrf_token %}
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="id_data" class="form-label required">
+                            <i class="fas fa-calendar-alt"></i> Data
+                        </label>
+                        {{ form.data }}
+                        {% if form.data.errors %}
+                        <div class="field-error">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            {% for error in form.data.errors %}{{ error }}{% endfor %}
+                        </div>
+                        {% endif %}
+                        <small class="form-help">Data em que as horas foram realizadas</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="id_quantidade" class="form-label required">
+                            <i class="fas fa-clock"></i> Quantidade (horas)
+                        </label>
+                        {{ form.quantidade }}
+                        {% if form.quantidade.errors %}
+                        <div class="field-error">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            {% for error in form.quantidade.errors %}{{ error }}{% endfor %}
+                        </div>
+                        {% endif %}
+                        <small class="form-help">Número de horas trabalhadas</small>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="id_descricao" class="form-label required">
+                        <i class="fas fa-align-left"></i> Descrição das Atividades
+                    </label>
+                    {{ form.descricao }}
+                    {% if form.descricao.errors %}
+                    <div class="field-error">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        {% for error in form.descricao.errors %}{{ error }}{% endfor %}
+                    </div>
+                    {% endif %}
+                    <small class="form-help">Descreva brevemente as atividades realizadas</small>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <i class="fas fa-save"></i> Registrar Horas
+                    </button>
+                    <a href="{% url 'consultar_horas' %}" class="btn btn-secondary">
+                        <i class="fas fa-list"></i> Ver Histórico
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+.page-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.page-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.page-header h1 {
+    font-size: 1.875rem;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin-bottom: 0.5rem;
+}
+
+.page-subtitle {
+    color: var(--text-gray);
+    font-size: 1rem;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+}
+
+.stat-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.5rem;
+    border-radius: 12px;
+    color: white;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.stat-total {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+
+.stat-pending {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+}
+
+.stat-target {
+    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+}
+
+.stat-icon {
+    font-size: 2rem;
+    opacity: 0.9;
+}
+
+.stat-content {
+    display: flex;
+    flex-direction: column;
+}
+
+.stat-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+}
+
+.stat-label {
+    font-size: 0.875rem;
+    opacity: 0.9;
+}
+
+.progress-card {
+    background: var(--white);
+    padding: 1.5rem;
+    border-radius: 12px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.progress-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+    font-weight: 600;
+    color: var(--text-dark);
+}
+
+.progress-percentage {
+    color: var(--primary-color);
+}
+
+.progress-bar-container {
+    height: 12px;
+    background-color: #E5E7EB;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #10b981 0%, #059669 100%);
+    border-radius: 6px;
+    transition: width 0.5s ease;
+}
+
+.form-card {
+    background: var(--white);
+    border-radius: 12px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+
+.card-header {
+    background: linear-gradient(135deg, var(--primary-color) 0%, #5a67d8 100%);
+    color: white;
+    padding: 1.25rem 1.5rem;
+}
+
+.card-header h2 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.card-body {
+    padding: 2rem;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    color: var(--text-dark);
+    margin-bottom: 0.5rem;
+}
+
+.form-label.required::after {
+    content: '*';
+    color: #DC2626;
+    margin-left: 0.25rem;
+}
+
+.form-label i {
+    color: var(--primary-color);
+}
+
+.form-control {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 2px solid #E5E7EB;
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.form-help {
+    display: block;
+    margin-top: 0.375rem;
+    font-size: 0.875rem;
+    color: var(--text-gray);
+}
+
+.field-error {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.375rem;
+    padding: 0.5rem 0.75rem;
+    background-color: #FEE2E2;
+    border-radius: 6px;
+    color: #991B1B;
+    font-size: 0.875rem;
+}
+
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid #E5E7EB;
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    border: none;
+}
+
+.btn-lg {
+    padding: 0.875rem 2rem;
+    font-size: 1rem;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--primary-color) 0%, #5a67d8 100%);
+    color: white;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+}
+
+.btn-secondary {
+    background-color: #F3F4F6;
+    color: var(--text-gray);
+}
+
+.btn-secondary:hover {
+    background-color: #E5E7EB;
+}
+
+.alert-success {
+    background-color: #D1FAE5;
+    border: 1px solid #A7F3D0;
+}
+
+.alert-error {
+    background-color: #FEE2E2;
+    border: 1px solid #FECACA;
+}
+</style>
+{% endblock %}

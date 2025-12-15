@@ -1,0 +1,380 @@
+{% extends 'base.html' %}
+
+{% block title %}Notificações - SAGE{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <div>
+            <h1><i class="fas fa-bell"></i> Central de Notificações</h1>
+            <p class="page-subtitle">Acompanhe alertas sobre prazos e documentos</p>
+        </div>
+        <span class="notification-count">
+            <i class="fas fa-envelope"></i> {{ notificacoes|length }} notificação(ões)
+        </span>
+    </div>
+
+    {% if messages %}
+    <div class="messages-container" style="margin-bottom: 1.5rem;">
+        {% for message in messages %}
+        <div class="alert {% if message.tags == 'success' %}alert-success{% elif message.tags == 'error' %}alert-error{% else %}alert-info{% endif %}">
+            {% if message.tags == 'success' %}
+                <i class="fas fa-check-circle"></i>
+            {% elif message.tags == 'error' %}
+                <i class="fas fa-exclamation-circle"></i>
+            {% else %}
+                <i class="fas fa-info-circle"></i>
+            {% endif %}
+            <span>{{ message }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if notificacoes %}
+    <div class="notifications-list">
+        {% for notificacao in notificacoes %}
+        <div class="notification-card {% if 'prazo' in notificacao.assunto|lower or 'alerta' in notificacao.assunto|lower %}notification-urgent{% elif 'aprovado' in notificacao.assunto|lower %}notification-success{% elif 'reprovado' in notificacao.assunto|lower or 'ajustes' in notificacao.assunto|lower %}notification-warning{% endif %}">
+            <div class="notification-icon">
+                {% if 'prazo' in notificacao.assunto|lower or 'alerta' in notificacao.assunto|lower %}
+                    <i class="fas fa-exclamation-triangle"></i>
+                {% elif 'aprovado' in notificacao.assunto|lower %}
+                    <i class="fas fa-check-circle"></i>
+                {% elif 'reprovado' in notificacao.assunto|lower %}
+                    <i class="fas fa-times-circle"></i>
+                {% elif 'ajustes' in notificacao.assunto|lower %}
+                    <i class="fas fa-edit"></i>
+                {% else %}
+                    <i class="fas fa-bell"></i>
+                {% endif %}
+            </div>
+            <div class="notification-content">
+                <div class="notification-header">
+                    <h3 class="notification-title">{{ notificacao.assunto }}</h3>
+                    <span class="notification-date">
+                        <i class="fas fa-clock"></i> {{ notificacao.data_envio|date:"d/m/Y H:i" }}
+                    </span>
+                </div>
+                <p class="notification-message">{{ notificacao.mensagem }}</p>
+                {% if notificacao.referencia %}
+                <div class="notification-reference">
+                    <span class="reference-badge">
+                        <i class="fas fa-file-alt"></i> {{ notificacao.referencia }}
+                    </span>
+                </div>
+                {% endif %}
+            </div>
+            <div class="notification-actions">
+                <form method="post" action="{% url 'marcar_notificacao_lida' notificacao.id %}" class="inline-form">
+                    {% csrf_token %}
+                    <button type="submit" class="btn-dismiss" title="Marcar como lida">
+                        <i class="fas fa-check"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <!-- Estado vazio quando não há notificações -->
+    <div class="empty-state">
+        <div class="empty-icon">
+            <i class="fas fa-bell-slash"></i>
+        </div>
+        <h3>Nenhuma notificação</h3>
+        <p>Você não possui notificações no momento. Quando houver atualizações sobre seus documentos ou prazos, elas aparecerão aqui.</p>
+        <a href="{% url 'dashboard' %}" class="btn btn-secondary">
+            <i class="fas fa-home"></i> Voltar ao Painel
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.page-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 2rem;
+}
+
+.page-header h1 {
+    font-size: 1.875rem;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin-bottom: 0.25rem;
+}
+
+.page-subtitle {
+    color: var(--text-gray);
+    font-size: 1rem;
+    margin: 0;
+}
+
+.notification-count {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: linear-gradient(135deg, var(--primary-color) 0%, #5a67d8 100%);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+.notifications-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.notification-card {
+    display: flex;
+    gap: 1rem;
+    padding: 1.5rem;
+    background: var(--white);
+    border-radius: 12px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    border-left: 4px solid #6366f1;
+    transition: all 0.3s ease;
+}
+
+.notification-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+.notification-urgent {
+    border-left-color: #f59e0b;
+    background: linear-gradient(to right, #FFFBEB, var(--white));
+}
+
+.notification-success {
+    border-left-color: #10b981;
+    background: linear-gradient(to right, #ECFDF5, var(--white));
+}
+
+.notification-warning {
+    border-left-color: #ef4444;
+    background: linear-gradient(to right, #FEF2F2, var(--white));
+}
+
+.notification-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    flex-shrink: 0;
+    background: linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%);
+    color: var(--primary-color);
+}
+
+.notification-urgent .notification-icon {
+    background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%);
+    color: #d97706;
+}
+
+.notification-success .notification-icon {
+    background: linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%);
+    color: #059669;
+}
+
+.notification-warning .notification-icon {
+    background: linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%);
+    color: #dc2626;
+}
+
+.notification-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.notification-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.notification-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-dark);
+    margin: 0;
+}
+
+.notification-date {
+    font-size: 0.75rem;
+    color: var(--text-gray);
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.notification-message {
+    color: var(--text-gray);
+    font-size: 0.875rem;
+    line-height: 1.5;
+    margin: 0 0 0.75rem 0;
+}
+
+.notification-reference {
+    margin-top: 0.5rem;
+}
+
+.reference-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.25rem 0.75rem;
+    background-color: #F3F4F6;
+    color: var(--text-gray);
+    border-radius: 6px;
+    font-size: 0.75rem;
+}
+
+.notification-actions {
+    display: flex;
+    align-items: flex-start;
+}
+
+.inline-form {
+    display: inline;
+}
+
+.btn-dismiss {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    border: none;
+    background-color: #F3F4F6;
+    color: var(--text-gray);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-dismiss:hover {
+    background-color: #10b981;
+    color: white;
+}
+
+.empty-state {
+    padding: 4rem 2rem;
+    text-align: center;
+    background: var(--white);
+    border-radius: 12px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.empty-icon {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 1.5rem;
+    background: linear-gradient(135deg, #F3F4F6 0%, #E5E7EB 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.empty-icon i {
+    font-size: 2.5rem;
+    color: var(--text-gray);
+}
+
+.empty-state h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-dark);
+    margin-bottom: 0.5rem;
+}
+
+.empty-state p {
+    color: var(--text-gray);
+    margin-bottom: 1.5rem;
+    max-width: 400px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    border: none;
+}
+
+.btn-secondary {
+    background-color: #F3F4F6;
+    color: var(--text-gray);
+}
+
+.btn-secondary:hover {
+    background-color: #E5E7EB;
+}
+
+.alert {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+}
+
+.alert-success {
+    background-color: #D1FAE5;
+    color: #065F46;
+    border: 1px solid #A7F3D0;
+}
+
+.alert-error {
+    background-color: #FEE2E2;
+    color: #991B1B;
+    border: 1px solid #FECACA;
+}
+
+.alert-info {
+    background-color: #DBEAFE;
+    color: #1E40AF;
+    border: 1px solid #BFDBFE;
+}
+
+@media (max-width: 640px) {
+    .notification-card {
+        flex-direction: column;
+    }
+    
+    .notification-header {
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+    
+    .notification-actions {
+        align-self: flex-end;
+    }
+}
+</style>
+{% endblock %}

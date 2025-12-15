@@ -16,4 +16,15 @@ urlpatterns = [
     path('api/notificacoes/', views.api_notificacoes, name='api_notificacoes'),
     path('api/notificacoes/<int:notificacao_id>/lida/', views.api_marcar_notificacao_lida, name='api_marcar_notificacao_lida'),
     path('api/verificar-prazos/', views.api_verificar_prazos, name='api_verificar_prazos'),
+    
+    # Rotas de cadastro e edição do aluno (Tasks 20914, 20918, 20920, 20924)
+    path('aluno/cadastrar/', views.cadastrar_aluno, name='cadastrar_aluno'),
+    path('aluno/editar/', views.editar_dados_aluno, name='editar_dados_aluno'),
+    
+    # Rotas de horas do aluno (Tasks 20926, 20928, 20929, 20932, 20937)
+    path('horas/cadastrar/', views.cadastrar_horas, name='cadastrar_horas'),
+    path('horas/consultar/', views.consultar_horas, name='consultar_horas'),
+    
+    # Rotas de feedbacks do supervisor (Tasks 20939, 20940, 20943)
+    path('feedbacks/', views.listar_feedbacks, name='listar_feedbacks'),
 ]
