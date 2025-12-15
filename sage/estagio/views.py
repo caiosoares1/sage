@@ -1,10 +1,12 @@
+
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.utils.timezone import now
 from django.contrib import messages
+from django.http import JsonResponse
 from admin.models import CursoCoordenador,Supervisor
-from .forms import EstagioForm, DocumentoForm
-from .models import Estagio, Documento, DocumentoHistorico
+from .forms import EstagioForm, DocumentoForm, AlunoCadastroForm, HorasCumpridasForm, SupervisorAlunoSelectForm
+from .models import Estagio, Documento, DocumentoHistorico, HorasCumpridas, Notificacao
 from users.models import Usuario
 from estagio.models import Aluno
 from django.views.decorators.http import require_POST
@@ -12,8 +14,10 @@ from django.db import transaction
 from decimal import Decimal, InvalidOperation
 from utils.email import enviar_notificacao_email
 from django.utils.dateparse import parse_date
-from utils.decorators import aluno_required
-
+from utils.decorators import aluno_required, supervisor_required
+from django.db.models import Sum
+from django.utils import timezone
+import logging
 
 @login_required
 @aluno_required
@@ -64,8 +68,9 @@ def solicitar_estagio(request):
 
             # Enviar notificação para o coordenador
             coordenador_email = coordenador.usuario.email if coordenador.usuario.email else 'coordenador@example.com'
+            aluno_email = aluno.contato if aluno.contato else None
             enviar_notificacao_email(
-                destinatario=coordenador_email,
+                destinatario=aluno_email or coordenador_email,
                 assunto=f"Novo documento enviado pelo aluno {aluno.nome}",
                 mensagem=f"O aluno {aluno.nome} enviou um novo documento para o estágio '{estagio.titulo}'. Por favor, revise o documento."
             )
@@ -250,6 +255,7 @@ def historico_documento(request, documento_id):
 
 
 @login_required
+@supervisor_required
 def supervisor_requerir_ajustes(request, documento_id):
     """Supervisor solicita ajustes em um documento.
 
@@ -285,16 +291,12 @@ def supervisor_requerir_ajustes(request, documento_id):
 
         # notificar por e-mail o usuário que enviou o documento com a data limite
         recipient = None
-        if doc.enviado_por and getattr(doc.enviado_por, 'email', None):
-            recipient = doc.enviado_por.email
-        elif hasattr(doc, 'estagio'):
-            # tentar obter um aluno vinculado ao estágio
-            try:
-                aluno = Aluno.objects.get(estagio=doc.estagio)
-                if aluno and aluno.usuario and getattr(aluno.usuario, 'email', None):
-                    recipient = aluno.usuario.email
-            except Exception:
-                recipient = None
+        try:
+            aluno = Aluno.objects.get(estagio=doc.estagio)
+            if aluno and aluno.contato:
+                recipient = aluno.contato
+        except Exception:
+            recipient = None
 
         subject = f"Ajustes solicitados: {doc.nome_arquivo} - prazo estabelecido"
         prazo_text = prazo_date.strftime('%d/%m/%Y') if prazo_date else 'sem prazo definido'
@@ -359,15 +361,12 @@ def supervisor_aprovar_documento(request, documento_id):
 
         # descobrir destinatário
         recipient_email = None
-        if doc.enviado_por and getattr(doc.enviado_por, 'email', None):
-            recipient_email = doc.enviado_por.email
-        else:
-            try:
-                aluno = Aluno.objects.get(estagio=doc.estagio)
-                if aluno and aluno.usuario and getattr(aluno.usuario, 'email', None):
-                    recipient_email = aluno.usuario.email
-            except Exception:
-                recipient_email = None
+        try:
+            aluno = Aluno.objects.get(estagio=doc.estagio)
+            if aluno and aluno.contato:
+                recipient_email = aluno.contato
+        except Exception:
+            recipient_email = None
 
         if recipient_email:
             enviar_notificacao_email(
@@ -426,15 +425,12 @@ def supervisor_reprovar_documento(request, documento_id):
 
         # descobrir destinatário
         recipient_email = None
-        if doc.enviado_por and getattr(doc.enviado_por, 'email', None):
-            recipient_email = doc.enviado_por.email
-        else:
-            try:
-                aluno = Aluno.objects.get(estagio=doc.estagio)
-                if aluno and aluno.usuario and getattr(aluno.usuario, 'email', None):
-                    recipient_email = aluno.usuario.email
-            except Exception:
-                recipient_email = None
+        try:
+            aluno = Aluno.objects.get(estagio=doc.estagio)
+            if aluno and aluno.contato:
+                recipient_email = aluno.contato
+        except Exception:
+            recipient_email = None
 
         if recipient_email:
             mensagem = f"Seu documento '{doc.nome_arquivo}' foi reprovado pelo supervisor {supervisor_obj.nome}.\n\n"
@@ -508,15 +504,12 @@ def supervisor_validar_documento(request, documento_id):
 
         # notificar aluno/remetente
         recipient = None
-        if doc.enviado_por and getattr(doc.enviado_por, 'email', None):
-            recipient = doc.enviado_por.email
-        else:
-            try:
-                aluno = Aluno.objects.get(estagio=doc.estagio)
-                if aluno and aluno.usuario and getattr(aluno.usuario, 'email', None):
-                    recipient = aluno.usuario.email
-            except Exception:
-                recipient = None
+        try:
+            aluno = Aluno.objects.get(estagio=doc.estagio)
+            if aluno and aluno.contato:
+                recipient = aluno.contato
+        except Exception:
+            recipient = None
 
         if recipient:
             assunto = f"Resultado da validação do documento: {doc.nome_arquivo}"
@@ -732,12 +725,311 @@ def reenviar_documento(request, documento_id):
     return redirect('listar_documentos')
 
 
+@login_required
+@aluno_required
+def cadastrar_aluno(request):
+    if request.method == 'POST':
+        form = AlunoCadastroForm(request.POST)
+        if form.is_valid():
+            usuario = Usuario.objects.get(id=request.user.id)
+            if Aluno.objects.filter(usuario=usuario).exists():
+                messages.error(request, 'Você já possui um cadastro de aluno.')
+                return redirect('cadastrar_aluno')
+            aluno = form.save(commit=False)
+            aluno.usuario = usuario
+            aluno.save()
+            messages.success(request, 'Cadastro realizado com sucesso!')
+            return redirect('dashboard')
+        else:
+            messages.error(request, 'Por favor, corrija os erros abaixo.')
+    else:
+        form = AlunoCadastroForm()
+    return render(request, 'estagio/cadastrar_aluno.html', {'form': form})
+
+
+@login_required
+@aluno_required
+def editar_dados_aluno(request):
+    usuario = Usuario.objects.get(id=request.user.id)
+    aluno = get_object_or_404(Aluno, usuario=usuario)
+    if request.method == 'POST':
+        form = AlunoCadastroForm(request.POST, instance=aluno)
+        # Bloqueio de edição do campo matrícula
+        if 'matricula' in form.changed_data:
+            form.add_error('matricula', 'Não é permitido alterar a matrícula.')
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Dados atualizados com sucesso!')
+            return redirect('editar_dados_aluno')
+        else:
+            messages.error(request, 'Por favor, corrija os erros abaixo.')
+    else:
+        form = AlunoCadastroForm(instance=aluno)
+        form.fields['matricula'].widget.attrs['readonly'] = True
+    return render(request, 'estagio/editar_dados_aluno.html', {'form': form, 'aluno': aluno})
+
+
+@login_required
+@aluno_required
+def cadastrar_horas(request):
+    usuario = Usuario.objects.get(id=request.user.id)
+    aluno = get_object_or_404(Aluno, usuario=usuario)
+    # Parametriza a meta de horas obrigatórias conforme a carga_horaria do estágio
+    if aluno.estagio and aluno.estagio.carga_horaria:
+        horas_obrigatorias = aluno.estagio.carga_horaria
+    else:
+        horas_obrigatorias = 100  # fallback padrão se não houver estágio vinculado
+    if request.method == 'POST':
+        form = HorasCumpridasForm(request.POST)
+        if form.is_valid():
+            horas = form.save(commit=False)
+            horas.aluno = aluno
+            horas.save()
+            total = HorasCumpridas.objects.filter(aluno=aluno).aggregate(total=Sum('quantidade'))['total'] or 0
+            pendente = max(horas_obrigatorias - total, 0)
+            messages.success(request, f'Horas cadastradas com sucesso! Total cumprido: {total}h. Horas pendentes: {pendente}h')
+            return redirect('cadastrar_horas')
+        else:
+            messages.error(request, 'Por favor, corrija os erros abaixo.')
+    else:
+        form = HorasCumpridasForm()
+    total = HorasCumpridas.objects.filter(aluno=aluno).aggregate(total=Sum('quantidade'))['total'] or 0
+    pendente = max(horas_obrigatorias - total, 0)
+    return render(request, 'estagio/cadastrar_horas.html', {'form': form, 'total_horas': total, 'horas_pendentes': pendente, 'horas_obrigatorias': horas_obrigatorias})
 
 
 
 
+@login_required
+@supervisor_required
+def supervisor_ver_horas(request):
+    aluno_selecionado = None
+    horas_list = []
+    total_horas = 0
+    form = SupervisorAlunoSelectForm(request.GET or None)
+    if form.is_valid():
+        aluno_selecionado = form.cleaned_data['aluno']
+        # CA3, CA8 - Lista detalhada, ordenação cronológica (mais recente primeiro)
+        horas_list = HorasCumpridas.objects.filter(aluno=aluno_selecionado).order_by('-data')
+        # CA2 - Total de horas
+        total_horas = horas_list.aggregate(total=Sum('quantidade'))['total'] or 0
+
+    context = {
+        'form': form,
+        'aluno_selecionado': aluno_selecionado,
+        'horas_list': horas_list,
+        'total_horas': total_horas,
+    }
+    return render(request, 'estagio/supervisor_ver_horas.html', context)
 
 
+@login_required
+def listar_notificacoes(request):
+    """View para listar as notificações do usuário logado"""
+    try:
+        usuario = Usuario.objects.get(id=request.user.id)
+        # Busca o aluno vinculado ao usuário para obter o email (contato)
+        try:
+            aluno = Aluno.objects.get(usuario=usuario)
+            email_destinatario = aluno.contato
+        except Aluno.DoesNotExist:
+            # Se não for aluno, tenta buscar como supervisor ou coordenador
+            try:
+                supervisor = Supervisor.objects.get(usuario=usuario)
+                email_destinatario = supervisor.contato
+            except Supervisor.DoesNotExist:
+                try:
+                    coordenador = CursoCoordenador.objects.get(usuario=usuario)
+                    email_destinatario = coordenador.contato
+                except CursoCoordenador.DoesNotExist:
+                    email_destinatario = usuario.email
+        
+        # Busca notificações enviadas para o email do usuário
+        notificacoes = Notificacao.objects.filter(destinatario=email_destinatario).order_by('-data_envio')
+    except Usuario.DoesNotExist:
+        notificacoes = []
+    
+    return render(request, 'estagio/listar_notificacoes.html', {'notificacoes': notificacoes})
 
 
+@login_required
+def marcar_notificacao_lida(request, notificacao_id):
+    """Marca uma notificação como lida (exclui da lista)"""
+    notificacao = get_object_or_404(Notificacao, id=notificacao_id)
+    # Verifica se o usuário tem permissão
+    try:
+        usuario = Usuario.objects.get(id=request.user.id)
+        try:
+            aluno = Aluno.objects.get(usuario=usuario)
+            email_destinatario = aluno.contato
+        except Aluno.DoesNotExist:
+            try:
+                supervisor = Supervisor.objects.get(usuario=usuario)
+                email_destinatario = supervisor.contato
+            except Supervisor.DoesNotExist:
+                try:
+                    coordenador = CursoCoordenador.objects.get(usuario=usuario)
+                    email_destinatario = coordenador.contato
+                except CursoCoordenador.DoesNotExist:
+                    email_destinatario = usuario.email
+        
+        if notificacao.destinatario == email_destinatario:
+            notificacao.delete()
+            messages.success(request, 'Notificação removida com sucesso.')
+        else:
+            messages.error(request, 'Você não tem permissão para remover esta notificação.')
+    except Usuario.DoesNotExist:
+        messages.error(request, 'Usuário não encontrado.')
+    
+    return redirect('listar_notificacoes')
+
+
+@login_required
+def api_notificacoes(request):
+    """API que retorna as notificações do usuário logado em formato JSON para o popup"""
+    try:
+        usuario = Usuario.objects.get(id=request.user.id)
+        # Busca o email do usuário conforme seu tipo
+        try:
+            aluno = Aluno.objects.get(usuario=usuario)
+            email_destinatario = aluno.contato
+        except Aluno.DoesNotExist:
+            try:
+                supervisor = Supervisor.objects.get(usuario=usuario)
+                email_destinatario = supervisor.contato
+            except Supervisor.DoesNotExist:
+                try:
+                    coordenador = CursoCoordenador.objects.get(usuario=usuario)
+                    email_destinatario = coordenador.contato
+                except CursoCoordenador.DoesNotExist:
+                    email_destinatario = usuario.email
+        
+        # Busca notificações enviadas para o email do usuário
+        notificacoes = Notificacao.objects.filter(destinatario=email_destinatario).order_by('-data_envio')[:10]
+        
+        data = {
+            'count': notificacoes.count(),
+            'notificacoes': [
+                {
+                    'id': n.id,
+                    'assunto': n.assunto,
+                    'mensagem': n.mensagem,
+                    'data_envio': n.data_envio.strftime('%d/%m/%Y %H:%M'),
+                    'referencia': n.referencia
+                } for n in notificacoes
+            ]
+        }
+    except Usuario.DoesNotExist:
+        data = {'count': 0, 'notificacoes': []}
+    
+    return JsonResponse(data)
+
+
+@login_required
+def api_marcar_notificacao_lida(request, notificacao_id):
+    """API para marcar uma notificação como lida (remove) via AJAX"""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Método não permitido'}, status=405)
+    
+    try:
+        usuario = Usuario.objects.get(id=request.user.id)
+        try:
+            aluno = Aluno.objects.get(usuario=usuario)
+            email_destinatario = aluno.contato
+        except Aluno.DoesNotExist:
+            try:
+                supervisor = Supervisor.objects.get(usuario=usuario)
+                email_destinatario = supervisor.contato
+            except Supervisor.DoesNotExist:
+                try:
+                    coordenador = CursoCoordenador.objects.get(usuario=usuario)
+                    email_destinatario = coordenador.contato
+                except CursoCoordenador.DoesNotExist:
+                    email_destinatario = usuario.email
+        
+        notificacao = get_object_or_404(Notificacao, id=notificacao_id)
+        
+        if notificacao.destinatario == email_destinatario:
+            notificacao.delete()
+            return JsonResponse({'success': True})
+        else:
+            return JsonResponse({'success': False, 'error': 'Sem permissão'}, status=403)
+    except Usuario.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Usuário não encontrado'}, status=404)
+
+
+def verificar_prazos_proximos(dias_alerta=3):
+    """Função utilitária para verificar e enviar notificações de prazos próximos
+    CA1 - Identifica documentos com prazos próximos automaticamente
+    CA2 - Envia notificação quando faltar o período mínimo definido
+    CA3 - Notificação informa nome do documento e data limite
+    CA4 - Não envia para documentos já entregues
+    CA5 - Impede notificações duplicadas
+    CA6 - Registra data e hora do envio
+    """
+    logger = logging.getLogger(__name__)
+    
+    hoje = timezone.now().date()
+    notificacoes_enviadas = []
+    
+    # CA1 - Identifica documentos com prazos próximos
+    # CA4 - Exclui documentos já entregues
+    documentos = Documento.objects.filter(
+        prazo_limite__isnull=False
+    ).exclude(
+        status__in=['aprovado', 'finalizado', 'substituido', 'enviado', 'corrigido']
+    )
+    
+    for doc in documentos:
+        if doc.prazo_limite:
+            dias_restantes = (doc.prazo_limite - hoje).days
+            # CA2 - Verifica se está dentro do período de alerta
+            if 0 <= dias_restantes <= dias_alerta:
+                try:
+                    aluno = Aluno.objects.get(estagio=doc.estagio)
+                    destinatario = aluno.contato
+                    # CA3 - Informa nome do documento e data limite
+                    assunto = f"Alerta: Prazo próximo para o documento {doc.nome_arquivo}"
+                    mensagem = f"O prazo para envio do documento '{doc.nome_arquivo}' termina em {dias_restantes} dia(s): {doc.prazo_limite.strftime('%d/%m/%Y')}. Por favor, envie o documento corrigido o quanto antes."
+                    # CA5 - Referência única para evitar duplicidade
+                    referencia = f"alerta_prazo_{doc.id}_{doc.prazo_limite}"
+                    
+                    # CA5 - Impede notificações duplicadas
+                    if not Notificacao.objects.filter(destinatario=destinatario, referencia=referencia).exists():
+                        try:
+                            enviar_notificacao_email(destinatario=destinatario, assunto=assunto, mensagem=mensagem)
+                        except Exception:
+                            pass  # Continua mesmo se email falhar
+                        
+                        # CA6 - Registra data e hora do envio
+                        notificacao = Notificacao.objects.create(
+                            destinatario=destinatario,
+                            assunto=assunto,
+                            mensagem=mensagem,
+                            referencia=referencia,
+                            data_envio=timezone.now()
+                        )
+                        notificacoes_enviadas.append(notificacao)
+                        logger.info(f"Notificação enviada para {destinatario} sobre documento {doc.id}")
+                except Aluno.DoesNotExist:
+                    logger.warning(f"Aluno não encontrado para o estágio do documento {doc.id}")
+                except Exception as e:
+                    logger.error(f"Erro ao notificar documento {doc.id}: {e}")
+    
+    return notificacoes_enviadas
+
+
+@login_required
+def api_verificar_prazos(request):
+    """API para verificar e enviar notificações de prazos próximos manualmente"""
+    dias_alerta = int(request.GET.get('dias', 3))
+    notificacoes = verificar_prazos_proximos(dias_alerta)
+    return JsonResponse({
+        'success': True,
+        'notificacoes_enviadas': len(notificacoes),
+        'detalhes': [
+            {'id': n.id, 'destinatario': n.destinatario, 'assunto': n.assunto}
+            for n in notificacoes
+        ]
+    })
 
