@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import Usuario, Notificacao
+from .models import Usuario
+from estagio.models import Notificacao
 
 @admin.register(Usuario)
 class UsuarioAdmin(UserAdmin):
@@ -15,9 +16,9 @@ class UsuarioAdmin(UserAdmin):
 
 @admin.register(Notificacao)
 class NotificacaoAdmin(admin.ModelAdmin):
-    list_display = ('mensagem_resumo', 'usuario', 'data_envio')
+    list_display = ('assunto', 'destinatario', 'data_envio', 'mensagem_resumo')
     list_filter = ('data_envio',)
-    search_fields = ('mensagem', 'usuario__username')
+    search_fields = ('assunto', 'mensagem', 'destinatario')
     date_hierarchy = 'data_envio'
     
     def mensagem_resumo(self, obj):

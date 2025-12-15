@@ -168,3 +168,18 @@ class Notificacao(models.Model):
         return f"Notificação para {self.destinatario} - {self.assunto} ({self.data_envio})"
 
 
+class FeedbackSupervisor(models.Model):
+    """Modelo para armazenar feedbacks do supervisor para o aluno"""
+    aluno = models.ForeignKey(Aluno, on_delete=models.CASCADE, related_name='feedbacks')
+    supervisor = models.ForeignKey(Supervisor, on_delete=models.CASCADE, related_name='feedbacks_dados')
+    estagio = models.ForeignKey(Estagio, on_delete=models.CASCADE, related_name='feedbacks')
+    conteudo = models.TextField()
+    data_feedback = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-data_feedback']
+        verbose_name = 'Feedback do Supervisor'
+        verbose_name_plural = 'Feedbacks do Supervisor'
+    
+    def __str__(self):
+        return f"Feedback de {self.supervisor.nome} para {self.aluno.nome} - {self.data_feedback.strftime('%d/%m/%Y')}"
