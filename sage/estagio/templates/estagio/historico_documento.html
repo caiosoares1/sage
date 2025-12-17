@@ -148,22 +148,44 @@
     <!-- Versões do Documento -->
     {% if versoes|length > 1 %}
     <div class="versions-card">
-        <h2><i class="fas fa-code-branch"></i> Versões do Documento</h2>
+        <h2><i class="fas fa-code-branch"></i> Versões do Documento ({{ versoes|length }} versões)</h2>
         <div class="versions-list">
-            {% for versao in versoes %}
+            {% for versao in versoes reversed %}
             <div class="version-item {% if versao.id == documento.id %}version-current{% endif %}">
                 <div class="version-header">
                     <span class="version-number">v{{ versao.versao }}</span>
-                    {% if versao.id == documento.id %}
+                    {% if forloop.first %}
                         <span class="badge badge-primary">Versão Atual</span>
+                    {% endif %}
+                    {% if versao.status == 'substituido' %}
+                        <span class="badge badge-secondary">Substituído</span>
                     {% endif %}
                 </div>
                 <div class="version-info">
                     <p><strong>Enviado em:</strong> {{ versao.data_envio|date:"d/m/Y" }}</p>
                     <p><strong>Status:</strong> 
-                        <span class="badge badge-secondary">{{ versao.get_status_display }}</span>
+                        {% if versao.status == 'enviado' %}
+                            <span class="badge badge-pending">Enviado</span>
+                        {% elif versao.status == 'aprovado' %}
+                            <span class="badge badge-approved">Aprovado</span>
+                        {% elif versao.status == 'reprovado' %}
+                            <span class="badge badge-rejected">Reprovado</span>
+                        {% elif versao.status == 'ajustes_solicitados' %}
+                            <span class="badge badge-warning">Ajustes Solicitados</span>
+                        {% elif versao.status == 'corrigido' %}
+                            <span class="badge badge-info">Corrigido</span>
+                        {% elif versao.status == 'finalizado' %}
+                            <span class="badge" style="background-color: #10b981; color: white;">Finalizado</span>
+                        {% elif versao.status == 'substituido' %}
+                            <span class="badge badge-secondary">Substituído</span>
+                        {% else %}
+                            <span class="badge badge-secondary">{{ versao.get_status_display }}</span>
+                        {% endif %}
                     </p>
                     <p><strong>Arquivo:</strong> {{ versao.nome_arquivo }}</p>
+                    {% if versao.observacoes_supervisor %}
+                    <p><strong>Observações:</strong> {{ versao.observacoes_supervisor }}</p>
+                    {% endif %}
                 </div>
                 <div class="version-actions">
                     <a href="{% url 'download_documento' versao.id %}" class="btn-small btn-secondary">

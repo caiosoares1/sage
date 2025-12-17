@@ -120,6 +120,51 @@ class Documento(models.Model):
         # history contém [atual, parent, parent.parent, ...]; inverter para mostrar do mais antigo
         return list(reversed(history))
 
+    def get_root(self):
+        """
+        Retorna o documento raiz da cadeia (primeira versão).
+        """
+        node = self
+        while node.parent:
+            node = node.parent
+        return node
+
+    def get_latest(self):
+        """
+        Retorna a versão mais recente da cadeia (navega pelos filhos).
+        """
+        node = self
+        while node.versions.exists():
+            node = node.versions.order_by('-versao').first()
+        return node
+
+    def get_full_history(self):
+        """
+        Retorna toda a cadeia de versões do documento, do mais antigo ao mais recente.
+        Começa do documento raiz e navega até a versão mais recente.
+        """
+        # Encontrar o documento raiz
+        root = self.get_root()
+        
+        # Navegar de cima para baixo coletando todas as versões
+        history = [root]
+        node = root
+        while node.versions.exists():
+            # Pega o filho (versão seguinte)
+            child = node.versions.order_by('versao').first()
+            if child:
+                history.append(child)
+                node = child
+            else:
+                break
+        return history
+
+    def is_latest_version(self):
+        """
+        Verifica se este documento é a versão mais recente da cadeia.
+        """
+        return not self.versions.exists()
+
 
 class DocumentoHistorico(models.Model):
     """Modelo para registrar histórico de validações de documentos"""

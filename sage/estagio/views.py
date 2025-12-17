@@ -135,15 +135,78 @@ def estagio_detalhe(request, estagio_id):
     """View para exibir detalhes de um estágio"""
     estagio = get_object_or_404(Estagio, id=estagio_id)
     
-    # Buscar documentos relacionados ao estágio
+    # Buscar apenas a versão mais recente de cada documento (documentos que não têm filhos)
     documentos = Documento.objects.filter(
-        estagio=estagio
+        estagio=estagio,
+        versions__isnull=True  # Não tem filhos = é a versão mais recente
     ).select_related('aprovado_por').order_by('-created_at')
     
     return render(request, "estagio/estagio_detalhe.html", {
         "estagio": estagio,
         "documentos": documentos
     })
+
+
+@login_required
+def historico_estagio(request, estagio_id):
+    """View para visualizar o histórico completo de todos os documentos de um estágio"""
+    estagio = get_object_or_404(Estagio, id=estagio_id)
+    
+    # Verificar permissão - aluno, supervisor ou coordenador
+    usuario = Usuario.objects.get(id=request.user.id)
+    tem_permissao = False
+    
+    try:
+        aluno = Aluno.objects.get(usuario=usuario)
+        if estagio == aluno.estagio:
+            tem_permissao = True
+    except Aluno.DoesNotExist:
+        pass
+    
+    try:
+        supervisor = Supervisor.objects.get(usuario=usuario)
+        if estagio.supervisor == supervisor:
+            tem_permissao = True
+    except Supervisor.DoesNotExist:
+        pass
+    
+    try:
+        coordenador = CursoCoordenador.objects.get(usuario=usuario)
+        # Verifica se coordenador tem permissão sobre algum documento deste estágio
+        if Documento.objects.filter(estagio=estagio, coordenador=coordenador).exists():
+            tem_permissao = True
+    except CursoCoordenador.DoesNotExist:
+        pass
+    
+    if not tem_permissao:
+        messages.error(request, "Você não tem permissão para visualizar este histórico.")
+        return redirect('dashboard')
+    
+    # Buscar todos os documentos do estágio
+    todos_documentos = Documento.objects.filter(estagio=estagio).select_related('aprovado_por', 'enviado_por')
+    
+    # Agrupar documentos por tipo (usando a raiz de cada cadeia)
+    documentos_por_tipo = {}
+    for doc in todos_documentos:
+        tipo = doc.tipo
+        if tipo not in documentos_por_tipo:
+            documentos_por_tipo[tipo] = []
+        documentos_por_tipo[tipo].append(doc)
+    
+    # Buscar histórico de todos os documentos
+    todos_ids = [doc.id for doc in todos_documentos]
+    historico = DocumentoHistorico.objects.filter(
+        documento_id__in=todos_ids
+    ).select_related('usuario', 'documento').order_by('-data_hora')
+    
+    context = {
+        'estagio': estagio,
+        'documentos_por_tipo': documentos_por_tipo,
+        'historico': historico,
+        'todos_documentos': todos_documentos,
+    }
+    
+    return render(request, "estagio/historico_estagio.html", context)
 
 
 @login_required
@@ -155,9 +218,12 @@ def listar_documentos(request):
         aluno = Aluno.objects.get(usuario=usuario)
         
         # Buscar todos os documentos relacionados aos estágios do aluno
+        # Filtrar apenas a versão mais recente de cada cadeia (documentos que não têm filhos)
         if aluno.estagio:
+            # Buscar apenas documentos que são a versão mais recente (não têm filhos)
             documentos = Documento.objects.filter(
-                estagio=aluno.estagio
+                estagio=aluno.estagio,
+                versions__isnull=True  # Não tem filhos = é a versão mais recente
             ).select_related('aprovado_por').order_by('-created_at')
         else:
             documentos = []
@@ -236,14 +302,21 @@ def historico_documento(request, documento_id):
             messages.error(request, "Você não tem permissão para visualizar este histórico.")
             return redirect('dashboard')
         
-        # Busca o histórico ordenado por data
-        historico = documento.historico.select_related('usuario').order_by('-data_hora')
+        # Obter toda a cadeia de versões (do mais antigo ao mais recente)
+        versoes = documento.get_full_history()
         
-        # Busca versões do documento
-        versoes = documento.get_history()
+        # Usar a versão mais recente como documento principal para exibição
+        documento_atual = versoes[-1] if versoes else documento
+        
+        # Buscar histórico de todas as versões na cadeia
+        from django.db.models import Q
+        versoes_ids = [v.id for v in versoes]
+        historico = DocumentoHistorico.objects.filter(
+            documento_id__in=versoes_ids
+        ).select_related('usuario', 'documento').order_by('-data_hora')
         
         context = {
-            'documento': documento,
+            'documento': documento_atual,
             'historico': historico,
             'versoes': versoes
         }
