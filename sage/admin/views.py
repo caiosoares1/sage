@@ -356,6 +356,71 @@ def aprovar_documento_coordenador(request, documento_id):
         return redirect('dashboard')
 
 
+@login_required
+@supervisor_required
+def alterar_status_estagio(request, estagio_id):
+    """View para o supervisor alterar o status do estágio para aprovado ou reprovado"""
+    if request.method != 'POST':
+        return redirect('supervisor:documentos')
+    
+    try:
+        # Busca o usuário e o supervisor vinculado
+        usuario = Usuario.objects.get(id=request.user.id)
+        supervisor = Supervisor.objects.get(usuario=usuario)
+        
+        # Busca o estágio e verifica se pertence a este supervisor
+        estagio = get_object_or_404(
+            Estagio,
+            id=estagio_id,
+            supervisor=supervisor
+        )
+        
+        # Verifica se o estágio está em andamento (documento já foi finalizado)
+        if estagio.status != 'em_andamento':
+            messages.error(request, "O estágio precisa estar em andamento para alterar o status.")
+            return redirect('supervisor:documentos')
+        
+        # Pega a ação
+        acao = request.POST.get('acao')
+        observacoes = request.POST.get('observacoes', '').strip()
+        
+        if acao == 'aprovar':
+            estagio.status = 'aprovado'
+            status_display = 'aprovado'
+            messages.success(request, f"Estágio '{estagio.titulo}' foi aprovado com sucesso!")
+        elif acao == 'reprovar':
+            if not observacoes:
+                messages.error(request, "Observações são obrigatórias para reprovar o estágio.")
+                return redirect('supervisor:documentos')
+            estagio.status = 'reprovado'
+            status_display = 'reprovado'
+            messages.success(request, f"Estágio '{estagio.titulo}' foi reprovado.")
+        else:
+            messages.error(request, "Ação inválida.")
+            return redirect('supervisor:documentos')
+        
+        estagio.save()
+        
+        # Enviar notificação ao aluno
+        aluno = estagio.aluno_set.first()
+        if aluno:
+            aluno_email = aluno.usuario.email
+            mensagem = f"Seu estágio '{estagio.titulo}' foi {status_display}."
+            if observacoes:
+                mensagem += f"\n\nObservações: {observacoes}"
+            enviar_notificacao_email(
+                destinatario=aluno_email,
+                assunto=f"Estágio {status_display.title()}",
+                mensagem=mensagem
+            )
+        
+        return redirect('supervisor:documentos')
+        
+    except (Usuario.DoesNotExist, Supervisor.DoesNotExist):
+        messages.error(request, "Supervisor não encontrado!")
+        return redirect('dashboard')
+
+
 
 
 

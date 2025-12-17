@@ -94,7 +94,8 @@
                         <th>Documento</th>
                         <th>Tipo</th>
                         <th>Data de Envio</th>
-                        <th>Status</th>
+                        <th>Status Doc.</th>
+                        <th>Status Estágio</th>
                         <th>Versão</th>
                         <th>Ações</th>
                     </tr>
@@ -160,13 +161,38 @@
                             <span class="version-badge">v{{ documento.versao }}</span>
                         </td>
                         <td>
+                            <!-- Status do Estágio -->
+                            {% if documento.estagio.status == 'analise' %}
+                                <span class="badge badge-pending">
+                                    <i class="fas fa-clock"></i> Em Análise
+                                </span>
+                            {% elif documento.estagio.status == 'em_andamento' %}
+                                <span class="badge" style="background-color: #3b82f6; color: white;">
+                                    <i class="fas fa-play-circle"></i> Em Andamento
+                                </span>
+                            {% elif documento.estagio.status == 'aprovado' %}
+                                <span class="badge badge-approved">
+                                    <i class="fas fa-check-circle"></i> Aprovado
+                                </span>
+                            {% elif documento.estagio.status == 'reprovado' %}
+                                <span class="badge badge-rejected">
+                                    <i class="fas fa-times-circle"></i> Reprovado
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td>
                             <div class="action-buttons">
                                 <a href="{% url 'supervisor:visualizar_documento' documento.id %}" class="btn-icon btn-view" title="Visualizar">
                                     <i class="fas fa-eye"></i>
                                 </a>
                                 {% if documento.status in 'enviado,corrigido' %}
-                                <button type="button" class="btn-icon btn-approve" onclick="openApprovalModal({{ documento.id }}, '{{ documento.nome_arquivo }}')" title="Aprovar/Reprovar">
+                                <button type="button" class="btn-icon btn-approve" onclick="openApprovalModal({{ documento.id }}, '{{ documento.nome_arquivo }}')" title="Aprovar/Reprovar Documento">
                                     <i class="fas fa-check"></i>
+                                </button>
+                                {% endif %}
+                                {% if documento.status == 'finalizado' and documento.estagio.status == 'em_andamento' %}
+                                <button type="button" class="btn-icon btn-status" onclick="openEstagioStatusModal({{ documento.estagio.id }}, '{{ documento.estagio.titulo }}')" title="Alterar Status do Estágio" style="background-color: #8b5cf6; color: white;">
+                                    <i class="fas fa-exchange-alt"></i>
                                 </button>
                                 {% endif %}
                             </div>
@@ -174,7 +200,7 @@
                     </tr>
                     {% if documento.observacoes_supervisor %}
                     <tr class="observation-row">
-                        <td colspan="7">
+                        <td colspan="8">
                             <div class="observation-box">
                                 <i class="fas fa-comment-alt"></i>
                                 <strong>Observações:</strong>
@@ -244,6 +270,53 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" onclick="closeApprovalModal()">Cancelar</button>
+                <button type="submit" class="btn btn-primary">Confirmar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal para Alterar Status do Estágio -->
+<div id="estagioStatusModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2><i class="fas fa-exchange-alt"></i> Alterar Status do Estágio</h2>
+            <button type="button" class="close-modal" onclick="closeEstagioStatusModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <form method="post" id="estagioStatusForm" action="">
+            {% csrf_token %}
+            <div class="modal-body">
+                <p><strong>Estágio:</strong> <span id="modalEstagioNome"></span></p>
+                
+                <div class="alert alert-info" style="margin: 1rem 0; padding: 1rem; background-color: #e0f2fe; border-radius: 8px;">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>Atenção:</strong> O documento já foi aprovado pelo coordenador. Agora você pode definir o status final do estágio.
+                </div>
+                
+                <div class="form-group">
+                    <label>Ação:</label>
+                    <div class="radio-group">
+                        <label class="radio-label radio-approve">
+                            <input type="radio" name="acao" value="aprovar" required onchange="toggleEstagioObservacoes()">
+                            <i class="fas fa-check-circle"></i> Aprovar Estágio
+                        </label>
+                        <label class="radio-label radio-reject">
+                            <input type="radio" name="acao" value="reprovar" required onchange="toggleEstagioObservacoes()">
+                            <i class="fas fa-times-circle"></i> Reprovar Estágio
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group" id="estagioObservacoesGroup" style="display: none;">
+                    <label for="estagioObservacoes">Observações <span class="required">*</span></label>
+                    <textarea name="observacoes" id="estagioObservacoes" rows="5" class="form-textarea" placeholder="Descreva o motivo da reprovação..."></textarea>
+                    <small class="help-text">Obrigatório ao reprovar o estágio</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeEstagioStatusModal()">Cancelar</button>
                 <button type="submit" class="btn btn-primary">Confirmar</button>
             </div>
         </form>
@@ -549,6 +622,47 @@ function toggleObservacoes() {
 document.getElementById('approvalModal').addEventListener('click', function(e) {
     if (e.target === this) {
         closeApprovalModal();
+    }
+});
+
+// Funções para o modal de alterar status do estágio
+let currentEstagioId = null;
+
+function openEstagioStatusModal(estagioId, estagioNome) {
+    currentEstagioId = estagioId;
+    document.getElementById('modalEstagioNome').textContent = estagioNome;
+    document.getElementById('estagioStatusForm').action = `/supervisor/estagio/${estagioId}/alterar-status/`;
+    document.getElementById('estagioStatusModal').classList.add('active');
+}
+
+function closeEstagioStatusModal() {
+    document.getElementById('estagioStatusModal').classList.remove('active');
+    document.getElementById('estagioStatusForm').reset();
+    document.getElementById('estagioObservacoesGroup').style.display = 'none';
+    currentEstagioId = null;
+}
+
+function toggleEstagioObservacoes() {
+    const acaoRadio = document.querySelector('#estagioStatusForm input[name="acao"]:checked');
+    if (!acaoRadio) return;
+    
+    const acao = acaoRadio.value;
+    const observacoesGroup = document.getElementById('estagioObservacoesGroup');
+    const observacoesField = document.getElementById('estagioObservacoes');
+    
+    if (acao === 'reprovar') {
+        observacoesGroup.style.display = 'block';
+        observacoesField.required = true;
+    } else {
+        observacoesGroup.style.display = 'none';
+        observacoesField.required = false;
+    }
+}
+
+// Fechar modal de estágio ao clicar fora
+document.getElementById('estagioStatusModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeEstagioStatusModal();
     }
 });
 </script>
