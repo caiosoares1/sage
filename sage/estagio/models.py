@@ -36,6 +36,11 @@ class Estagio(models.Model):
     cargo = models.CharField(max_length=50)
     carga_horaria = models.IntegerField()
     data_fim = models.DateField()
+    descricao = models.TextField(null=True, blank=True)
+    
+    # Campo para histórico - aluno que solicitou o estágio
+    aluno_solicitante = models.ForeignKey('Aluno', on_delete=models.CASCADE, null=True, blank=True, related_name='estagios_solicitados')
+    data_solicitacao = models.DateTimeField(auto_now_add=True, null=True)
 
     empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE)
     supervisor = models.ForeignKey(Supervisor, on_delete=models.CASCADE)

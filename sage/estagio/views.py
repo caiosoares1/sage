@@ -31,12 +31,14 @@ def solicitar_estagio(request):
             # Salva estágio com status inicial "Em análise"
             estagio = estagio_form.save(commit=False)
             estagio.status = "analise"
-            estagio.save()
-
+            
             # Vincula o estágio ao aluno logado
             try:
                 usuario = Usuario.objects.get(id=request.user.id)
                 aluno = Aluno.objects.get(usuario=usuario)
+                estagio.aluno_solicitante = aluno  # Salva o aluno que solicitou
+                estagio.save()
+                
                 aluno.estagio = estagio
                 aluno.save()
             except (Usuario.DoesNotExist, Aluno.DoesNotExist):
@@ -126,6 +128,31 @@ def acompanhar_estagios(request):
     return render(request, "estagio/acompanhar_estagios.html", {
         "estagios": estagios,
         "stats": stats
+    })
+
+
+@login_required
+@aluno_required
+def historico_solicitacoes(request):
+    """View para listar o histórico de todas as solicitações de estágio do aluno"""
+    try:
+        usuario = Usuario.objects.get(id=request.user.id)
+        aluno = Aluno.objects.get(usuario=usuario)
+        
+        from django.db.models import Q
+        
+        # Buscar todos os estágios relacionados ao aluno:
+        # 1. Usando o novo campo aluno_solicitante
+        # 2. Usando a relação inversa aluno_set (estágios que têm este aluno vinculado)
+        solicitacoes = Estagio.objects.filter(
+            Q(aluno_solicitante=aluno) | Q(aluno__id=aluno.id)
+        ).select_related('empresa', 'supervisor').distinct().order_by('-id')
+        
+    except (Usuario.DoesNotExist, Aluno.DoesNotExist):
+        solicitacoes = []
+    
+    return render(request, "estagio/historico_solicitacoes.html", {
+        "solicitacoes": solicitacoes
     })
 
 

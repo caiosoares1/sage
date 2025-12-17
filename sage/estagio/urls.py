@@ -5,6 +5,7 @@ from estagio.views import cadastrar_aluno
 urlpatterns = [
     path('solicitar/', views.solicitar_estagio, name='solicitar_estagio'),
     path('acompanhar/', views.acompanhar_estagios, name='acompanhar_estagios'),
+    path('historico-solicitacoes/', views.historico_solicitacoes, name='historico_solicitacoes'),
     path('detalhe/<int:estagio_id>/', views.estagio_detalhe, name='estagio_detalhe'),
     path('detalhe/<int:estagio_id>/historico/', views.historico_estagio, name='historico_estagio'),
     path('documentos/', views.listar_documentos, name='listar_documentos'),
