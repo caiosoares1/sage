@@ -26,6 +26,7 @@ class Aluno(models.Model):
 class Estagio(models.Model):
     STATUS_CHOICES = [
         ('analise', 'Em análise'),
+        ('em_andamento', 'Em andamento'),
         ('aprovado', 'Aprovado'),
         ('reprovado', 'Reprovado'),
     ]

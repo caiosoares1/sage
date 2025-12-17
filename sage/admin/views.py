@@ -320,6 +320,12 @@ def aprovar_documento_coordenador(request, documento_id):
         
         documento.save()
         
+        # Atualizar status do estágio para 'em_andamento'
+        estagio = documento.estagio
+        if estagio.status == 'analise':
+            estagio.status = 'em_andamento'
+            estagio.save()
+        
         # Registrar no histórico
         registrar_historico(documento, 'finalizado', usuario, "Aprovação final do coordenador")
         

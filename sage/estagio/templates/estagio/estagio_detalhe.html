@@ -46,6 +46,8 @@
                     <p>
                         {% if estagio.status == 'analise' %}
                             <span class="badge badge-pending">Em Análise</span>
+                        {% elif estagio.status == 'em_andamento' %}
+                            <span class="badge" style="background-color: #3b82f6; color: white;"><i class="fas fa-play-circle"></i> Em Andamento</span>
                         {% elif estagio.status == 'aprovado' %}
                             <span class="badge badge-approved">Aprovado</span>
                         {% elif estagio.status == 'reprovado' %}

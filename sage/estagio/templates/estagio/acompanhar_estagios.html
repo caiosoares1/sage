@@ -111,6 +111,10 @@
                                 <span class="badge badge-pending">
                                     <i class="fas fa-clock"></i> Em Análise
                                 </span>
+                            {% elif estagio.status == 'em_andamento' %}
+                                <span class="badge" style="background-color: #3b82f6; color: white;">
+                                    <i class="fas fa-play-circle"></i> Em Andamento
+                                </span>
                             {% elif estagio.status == 'aprovado' %}
                                 <span class="badge badge-approved">
                                     <i class="fas fa-check-circle"></i> Aprovado
@@ -142,6 +146,7 @@
             <strong>Status das solicitações:</strong>
             <ul>
                 <li><strong>Em Análise:</strong> Sua solicitação está em análise.</li>
+                <li><strong>Em Andamento:</strong> Seu estágio foi aprovado e está em andamento.</li>
                 <li><strong>Aprovado:</strong> Sua solicitação foi aprovada.</li>
                 <li><strong>Reprovado:</strong> Sua solicitação foi reprovada.</li>
             </ul>
