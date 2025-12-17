@@ -117,7 +117,7 @@
             </div>
 
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary">
+                <button type="submit" id="submitBtn" class="btn btn-primary" disabled>
                     <i class="fas fa-paper-plane"></i> Enviar Solicitação
                 </button>
                 <a href="{% url 'acompanhar_estagios' %}" class="btn btn-secondary">
@@ -210,6 +210,16 @@
     margin-right: 0.5rem;
 }
 
+.btn:disabled {
+    background-color: #9CA3AF;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.btn:disabled:hover {
+    background-color: #9CA3AF;
+}
+
 @media (max-width: 768px) {
     .form-row {
         grid-template-columns: 1fr;
@@ -226,6 +236,54 @@
 </style>
 
 <script>
+// Função para verificar se todos os campos obrigatórios estão preenchidos
+function checkFormValidity() {
+    const form = document.getElementById('estagioForm');
+    const submitBtn = document.getElementById('submitBtn');
+    if (!form || !submitBtn) return;
+    
+    let isValid = true;
+    
+    // Verificar campos obrigatórios
+    form.querySelectorAll('[required]').forEach(input => {
+        if (!input.value.trim()) {
+            isValid = false;
+        }
+    });
+    
+    // Verificar arquivo
+    const arquivo = form.querySelector('[name="arquivo"]');
+    if (arquivo && !arquivo.files[0]) {
+        isValid = false;
+    }
+    
+    // Verificar datas
+    const dataInicio = form.querySelector('[name="data_inicio"]');
+    const dataFim = form.querySelector('[name="data_fim"]');
+    if (dataInicio && dataFim && dataInicio.value && dataFim.value) {
+        if (new Date(dataFim.value) <= new Date(dataInicio.value)) {
+            isValid = false;
+        }
+    }
+    
+    submitBtn.disabled = !isValid;
+}
+
+// Adicionar listeners para todos os campos do formulário
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('estagioForm');
+    if (form) {
+        // Monitorar mudanças em todos os inputs
+        form.querySelectorAll('input, select, textarea').forEach(input => {
+            input.addEventListener('input', checkFormValidity);
+            input.addEventListener('change', checkFormValidity);
+        });
+        
+        // Verificar estado inicial
+        checkFormValidity();
+    }
+});
+
 // Validação no cliente
 document.getElementById('estagioForm')?.addEventListener('submit', function(e) {
     let isValid = true;
@@ -275,6 +333,13 @@ document.getElementById('estagioForm')?.addEventListener('submit', function(e) {
     if (!isValid) {
         e.preventDefault();
         window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+        // Desativar botão de envio para evitar duplo clique
+        const submitBtn = form.querySelector('button[type="submit"]');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+        }
     }
 });
 
