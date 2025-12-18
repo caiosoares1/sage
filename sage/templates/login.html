@@ -157,6 +157,13 @@
                 <input type="hidden" name="next" value="{{ next }}">
             </form>
 
+            <div class="register-link" style="text-align: center; margin-top: 1.5rem;">
+                <span style="color: var(--text-gray); font-size: 0.875rem;">Não tem conta?</span>
+                <a href="{% url 'cadastrar_aluno' %}" style="color: var(--primary-color); font-weight: 600; text-decoration: none; margin-left: 0.5rem;">
+                    <i class="fas fa-user-plus"></i> Cadastre-se como Aluno
+                </a>
+            </div>
+
             <div class="credentials-hint">
                 <strong>Usuários de exemplo:</strong><br>
                 Aluno: <code>caio.batista</code> / <code>senha123</code><br>

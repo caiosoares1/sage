@@ -870,26 +870,99 @@ def reenviar_documento(request, documento_id):
     return redirect('listar_documentos')
 
 
-@login_required
-@aluno_required
 def cadastrar_aluno(request):
+    """View pública para cadastro de dados pessoais e acadêmicos do aluno.
+    Permite que um usuário não autenticado se cadastre como aluno,
+    ou que um usuário autenticado (sem outro perfil) complete seu cadastro.
+    
+    Supervisores e Coordenadores NÃO podem se cadastrar como alunos.
+    """
+    # Se usuário está autenticado, verificar se já tem perfil
+    if request.user.is_authenticated:
+        usuario = Usuario.objects.get(id=request.user.id)
+        
+        # Impedir supervisores e coordenadores de se cadastrarem como alunos
+        if hasattr(request.user, 'supervisor'):
+            messages.error(request, 'Supervisores não podem se cadastrar como alunos.')
+            return redirect('dashboard')
+        
+        if hasattr(request.user, 'cursocoordenador'):
+            messages.error(request, 'Coordenadores não podem se cadastrar como alunos.')
+            return redirect('dashboard')
+        
+        # Verifica se o usuário já é aluno
+        if Aluno.objects.filter(usuario=usuario).exists():
+            messages.info(request, 'Você já possui um cadastro de aluno.')
+            return redirect('editar_dados_aluno')
+    else:
+        usuario = None
+    
     if request.method == 'POST':
         form = AlunoCadastroForm(request.POST)
-        if form.is_valid():
-            usuario = Usuario.objects.get(id=request.user.id)
-            if Aluno.objects.filter(usuario=usuario).exists():
-                messages.error(request, 'Você já possui um cadastro de aluno.')
-                return redirect('cadastrar_aluno')
-            aluno = form.save(commit=False)
-            aluno.usuario = usuario
-            aluno.save()
-            messages.success(request, 'Cadastro realizado com sucesso!')
-            return redirect('dashboard')
+        
+        # Se não está logado, precisamos criar o usuário também
+        if not request.user.is_authenticated:
+            username = request.POST.get('username', '').strip()
+            email = request.POST.get('contato', '').strip()
+            password = request.POST.get('password', '')
+            password_confirm = request.POST.get('password_confirm', '')
+            
+            # Validações de usuário
+            if not username:
+                messages.error(request, 'O nome de usuário é obrigatório.')
+                return render(request, 'estagio/cadastrar_aluno.html', {'form': form, 'show_user_fields': True})
+            
+            if not password or len(password) < 6:
+                messages.error(request, 'A senha deve ter pelo menos 6 caracteres.')
+                return render(request, 'estagio/cadastrar_aluno.html', {'form': form, 'show_user_fields': True})
+            
+            if password != password_confirm:
+                messages.error(request, 'As senhas não coincidem.')
+                return render(request, 'estagio/cadastrar_aluno.html', {'form': form, 'show_user_fields': True})
+            
+            if Usuario.objects.filter(username=username).exists():
+                messages.error(request, 'Este nome de usuário já está em uso.')
+                return render(request, 'estagio/cadastrar_aluno.html', {'form': form, 'show_user_fields': True})
+            
+            if form.is_valid():
+                # Criar usuário
+                usuario = Usuario.objects.create_user(
+                    username=username,
+                    email=email,
+                    password=password,
+                    tipo='aluno'
+                )
+                
+                # Criar aluno
+                aluno = form.save(commit=False)
+                aluno.usuario = usuario
+                aluno.save()
+                
+                # Fazer login automático
+                from django.contrib.auth import login
+                login(request, usuario)
+                
+                messages.success(request, 'Cadastro realizado com sucesso! Bem-vindo ao sistema.')
+                return redirect('dashboard')
+            else:
+                messages.error(request, 'Por favor, corrija os erros abaixo.')
+                return render(request, 'estagio/cadastrar_aluno.html', {'form': form, 'show_user_fields': True})
         else:
-            messages.error(request, 'Por favor, corrija os erros abaixo.')
+            # Usuário já está logado
+            if form.is_valid():
+                aluno = form.save(commit=False)
+                aluno.usuario = usuario
+                aluno.save()
+                messages.success(request, 'Cadastro realizado com sucesso!')
+                return redirect('dashboard')
+            else:
+                messages.error(request, 'Por favor, corrija os erros abaixo.')
     else:
         form = AlunoCadastroForm()
-    return render(request, 'estagio/cadastrar_aluno.html', {'form': form})
+    
+    # Mostrar campos de usuário apenas se não estiver logado
+    show_user_fields = not request.user.is_authenticated
+    return render(request, 'estagio/cadastrar_aluno.html', {'form': form, 'show_user_fields': show_user_fields})
 
 
 @login_required

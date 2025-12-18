@@ -50,6 +50,13 @@
             </a>
             
             {% if user.is_authenticated %}
+                <!-- Menu para usuário sem perfil de aluno - opção de cadastro -->
+                {% if not user.aluno and not user.supervisor and not user.cursocoordenador %}
+                    <a href="{% url 'cadastrar_aluno' %}" class="nav-item {% block nav_cadastrar_aluno %}{% endblock %}">
+                        <i class="fas fa-user-plus"></i> Completar Cadastro
+                    </a>
+                {% endif %}
+                
                 <!-- Menu para Aluno -->
                 {% if user.aluno %}
                     <a href="{% url 'acompanhar_estagios' %}" class="nav-item {% block nav_estagios %}{% endblock %}">

@@ -1,6 +1,5 @@
 from django.urls import path
 from . import views
-from estagio.views import cadastrar_aluno
 
 urlpatterns = [
     path('solicitar/', views.solicitar_estagio, name='solicitar_estagio'),
@@ -20,8 +19,7 @@ urlpatterns = [
     path('api/notificacoes/<int:notificacao_id>/lida/', views.api_marcar_notificacao_lida, name='api_marcar_notificacao_lida'),
     path('api/verificar-prazos/', views.api_verificar_prazos, name='api_verificar_prazos'),
     
-    # Rotas de cadastro e edição do aluno (Tasks 20914, 20918, 20920, 20924)
-    path('aluno/cadastrar/', views.cadastrar_aluno, name='cadastrar_aluno'),
+    # Rotas de edição do aluno (cadastro movido para rota pública /cadastro/)
     path('aluno/editar/', views.editar_dados_aluno, name='editar_dados_aluno'),
     
     # Rotas de horas do aluno (Tasks 20926, 20928, 20929, 20932, 20937)

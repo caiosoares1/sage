@@ -20,12 +20,14 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.views.generic import TemplateView
 from django.contrib.auth import views as auth_views
+from estagio.views import cadastrar_aluno
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', TemplateView.as_view(template_name='dashboard.html'), name='dashboard'),
     path('login/', auth_views.LoginView.as_view(template_name='login.html'), name='login'),
     path('logout/', auth_views.LogoutView.as_view(next_page='login'), name='logout'),
+    path('cadastro/', cadastrar_aluno, name='cadastrar_aluno'),  # Cadastro público como aluno
     path('students/', TemplateView.as_view(template_name='dashboard.html'), name='students'),
     path('enterprises/', TemplateView.as_view(template_name='dashboard.html'), name='enterprises'),
     path('users/', TemplateView.as_view(template_name='dashboard.html'), name='users'),

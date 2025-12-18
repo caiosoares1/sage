@@ -40,7 +40,7 @@ class Command(BaseCommand):
         # Create student
         aluno = Aluno.objects.create(
             nome=f'{usuario.first_name} {usuario.last_name}' if usuario.first_name else usuario.username,
-            contato='(11) 9999-9999',
+            contato=usuario.email or f'{usuario.username}@exemplo.com',
             matricula=f'2025{usuario.id:04d}',
             usuario=usuario,
             instituicao=inst

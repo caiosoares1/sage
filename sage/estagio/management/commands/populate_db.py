@@ -223,7 +223,7 @@ class Command(BaseCommand):
         self.stdout.write('Creating students...')
         aluno1 = Aluno.objects.create(
             nome='Caio Batista',
-            contato='(11) 9999-4444',
+            contato='caio@exemplo.com',
             matricula='20210001',
             usuario=user_aluno1,
             instituicao=inst1,
@@ -232,7 +232,7 @@ class Command(BaseCommand):
         
         aluno2 = Aluno.objects.create(
             nome='Julia Costa',
-            contato='(11) 9999-5555',
+            contato='julia@exemplo.com',
             matricula='20210002',
             usuario=user_aluno2,
             instituicao=inst2,
@@ -241,7 +241,7 @@ class Command(BaseCommand):
         
         aluno3 = Aluno.objects.create(
             nome='Pedro Alves',
-            contato='(11) 9999-6666',
+            contato='pedro@exemplo.com',
             matricula='20210003',
             usuario=user_aluno3,
             instituicao=inst1,
