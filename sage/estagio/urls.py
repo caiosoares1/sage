@@ -16,6 +16,7 @@ urlpatterns = [
     path('notificacoes/', views.listar_notificacoes, name='listar_notificacoes'),
     path('notificacoes/<int:notificacao_id>/lida/', views.marcar_notificacao_lida, name='marcar_notificacao_lida'),
     path('api/notificacoes/', views.api_notificacoes, name='api_notificacoes'),
+    path('api/notificacoes-nao-lidas/', views.api_contar_notificacoes_nao_lidas, name='api_contar_notificacoes_nao_lidas'),
     path('api/notificacoes/<int:notificacao_id>/lida/', views.api_marcar_notificacao_lida, name='api_marcar_notificacao_lida'),
     path('api/verificar-prazos/', views.api_verificar_prazos, name='api_verificar_prazos'),
     
@@ -29,4 +30,6 @@ urlpatterns = [
     
     # Rotas de feedbacks do supervisor (Tasks 20939, 20940, 20943)
     path('feedbacks/', views.listar_feedbacks, name='listar_feedbacks'),
+    path('supervisor/enviar-feedback/', views.enviar_feedback_aluno, name='enviar_feedback_aluno'),
+    path('supervisor/enviar-feedback/<int:aluno_id>/', views.enviar_feedback_aluno, name='enviar_feedback_aluno_especifico'),
 ]

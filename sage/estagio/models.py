@@ -214,6 +214,7 @@ class Notificacao(models.Model):
 
     class Meta:
         unique_together = ('destinatario', 'assunto', 'referencia')  # Impede duplicidade
+        ordering = ['-data_envio']  # Mais recentes primeiro
 
     def __str__(self):
         return f"Notificação para {self.destinatario} - {self.assunto} ({self.data_envio})"

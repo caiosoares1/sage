@@ -2,11 +2,14 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Count, Q
-from estagio.models import Estagio, Documento, DocumentoHistorico
+from estagio.models import Estagio, Documento, DocumentoHistorico, Notificacao
 from .models import CursoCoordenador, Supervisor
 from users.models import Usuario
 from utils.email import enviar_notificacao_email
 from utils.decorators import supervisor_required, coordenador_required
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def registrar_historico(documento, acao, usuario, observacoes=None):
@@ -180,11 +183,23 @@ def avaliar_documento(request, documento_id):
         aluno = documento.estagio.aluno_set.first()
         if aluno:
             aluno_email = aluno.usuario.email
+            assunto = f"Documento {tipo_documento} - {status_display}"
+            mensagem = f"Seu documento '{nome_arquivo}' foi {status_display.lower()}.\n\n{observacoes if observacoes else ''}"
             enviar_notificacao_email(
                 destinatario=aluno_email,
-                assunto=f"Documento {tipo_documento} - {status_display}",
-                mensagem=f"Seu documento '{nome_arquivo}' foi {status_display.lower()}.\n\n{observacoes if observacoes else ''}"
+                assunto=assunto,
+                mensagem=mensagem
             )
+            # Criar notificação no sistema
+            try:
+                Notificacao.objects.get_or_create(
+                    destinatario=aluno_email,
+                    assunto=assunto,
+                    referencia=f"doc_{status_display.lower().replace(' ', '_')}_{documento.id}",
+                    defaults={'mensagem': mensagem}
+                )
+            except Exception as e:
+                logger.warning(f"Erro ao criar notificação: {str(e)}")
         
         return redirect('supervisor:documentos')
         
@@ -335,19 +350,43 @@ def aprovar_documento_coordenador(request, documento_id):
         aluno = documento.estagio.aluno_set.first()
         if aluno:
             aluno_email = aluno.usuario.email
+            assunto_aluno = f"Documento {tipo_documento} - Aprovação Final"
+            mensagem_aluno = f"Seu documento '{nome_arquivo}' foi aprovado pelo coordenador e está finalizado!"
             enviar_notificacao_email(
                 destinatario=aluno_email,
-                assunto=f"Documento {tipo_documento} - Aprovação Final",
-                mensagem=f"Seu documento '{nome_arquivo}' foi aprovado pelo coordenador e está finalizado!"
+                assunto=assunto_aluno,
+                mensagem=mensagem_aluno
             )
+            # Criar notificação no sistema
+            try:
+                Notificacao.objects.get_or_create(
+                    destinatario=aluno_email,
+                    assunto=assunto_aluno,
+                    referencia=f"doc_finalizado_{documento.id}",
+                    defaults={'mensagem': mensagem_aluno}
+                )
+            except Exception as e:
+                logger.warning(f"Erro ao criar notificação: {str(e)}")
         
         # Enviar notificação ao supervisor
         supervisor_email = documento.estagio.supervisor.usuario.email
+        assunto_sup = f"Documento {tipo_documento} - Aprovação Final"
+        mensagem_sup = f"O documento '{nome_arquivo}' foi aprovado pelo coordenador."
         enviar_notificacao_email(
             destinatario=supervisor_email,
-            assunto=f"Documento {tipo_documento} - Aprovação Final",
-            mensagem=f"O documento '{nome_arquivo}' foi aprovado pelo coordenador."
+            assunto=assunto_sup,
+            mensagem=mensagem_sup
         )
+        # Criar notificação no sistema
+        try:
+            Notificacao.objects.get_or_create(
+                destinatario=supervisor_email,
+                assunto=assunto_sup,
+                referencia=f"doc_finalizado_{documento.id}",
+                defaults={'mensagem': mensagem_sup}
+            )
+        except Exception as e:
+            logger.warning(f"Erro ao criar notificação: {str(e)}")
         
         return redirect('coordenador:documentos')
         

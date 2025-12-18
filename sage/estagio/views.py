@@ -6,7 +6,7 @@ from django.contrib import messages
 from django.http import JsonResponse
 from admin.models import CursoCoordenador,Supervisor
 from .forms import EstagioForm, DocumentoForm, AlunoCadastroForm, HorasCumpridasForm, SupervisorAlunoSelectForm
-from .models import Estagio, Documento, DocumentoHistorico, HorasCumpridas, Notificacao
+from .models import Estagio, Documento, DocumentoHistorico, HorasCumpridas, Notificacao, FeedbackSupervisor
 from users.models import Usuario
 from estagio.models import Aluno
 from django.views.decorators.http import require_POST
@@ -18,6 +18,8 @@ from utils.decorators import aluno_required, supervisor_required
 from django.db.models import Sum
 from django.utils import timezone
 import logging
+
+logger = logging.getLogger(__name__)
 
 @login_required
 @aluno_required
@@ -393,8 +395,8 @@ def supervisor_requerir_ajustes(request, documento_id):
         recipient = None
         try:
             aluno = Aluno.objects.get(estagio=doc.estagio)
-            if aluno and aluno.contato:
-                recipient = aluno.contato
+            if aluno and aluno.usuario and aluno.usuario.email:
+                recipient = aluno.usuario.email
         except Exception:
             recipient = None
 
@@ -409,6 +411,16 @@ def supervisor_requerir_ajustes(request, documento_id):
         if recipient:
             try:
                 enviar_notificacao_email(destinatario=recipient, assunto=subject, mensagem=message)
+                # Criar notificação no sistema
+                try:
+                    Notificacao.objects.get_or_create(
+                        destinatario=recipient,
+                        assunto=subject,
+                        referencia=f"doc_ajustes_{doc.id}",
+                        defaults={'mensagem': message}
+                    )
+                except Exception as e:
+                    logger.warning(f"Erro ao criar notificação: {str(e)}")
             except Exception:
                 pass
 
@@ -463,20 +475,32 @@ def supervisor_aprovar_documento(request, documento_id):
         recipient_email = None
         try:
             aluno = Aluno.objects.get(estagio=doc.estagio)
-            if aluno and aluno.contato:
-                recipient_email = aluno.contato
+            if aluno and aluno.usuario and aluno.usuario.email:
+                recipient_email = aluno.usuario.email
         except Exception:
             recipient_email = None
 
         if recipient_email:
+            assunto = f"Documento aprovado: {doc.nome_arquivo}"
+            mensagem = (
+                f"Seu documento '{doc.nome_arquivo}' foi aprovado pelo supervisor {supervisor_obj.nome}.\n\n"
+                "Acesse o sistema para mais informações."
+            )
             enviar_notificacao_email(
                 destinatario=recipient_email,
-                assunto=f"Documento aprovado: {doc.nome_arquivo}",
-                mensagem=(
-                    f"Seu documento '{doc.nome_arquivo}' foi aprovado pelo supervisor {supervisor_obj.nome}.\n\n"
-                    "Acesse o sistema para mais informações."
-                ),
+                assunto=assunto,
+                mensagem=mensagem,
             )
+            # Criar notificação no sistema
+            try:
+                Notificacao.objects.get_or_create(
+                    destinatario=recipient_email,
+                    assunto=assunto,
+                    referencia=f"doc_aprovado_{doc.id}",
+                    defaults={'mensagem': mensagem}
+                )
+            except Exception as e:
+                logger.warning(f"Erro ao criar notificação: {str(e)}")
 
         messages.success(request, "Documento aprovado com sucesso.")
         return redirect('estagio_detalhe', estagio_id=doc.estagio.id)
@@ -527,17 +551,28 @@ def supervisor_reprovar_documento(request, documento_id):
         recipient_email = None
         try:
             aluno = Aluno.objects.get(estagio=doc.estagio)
-            if aluno and aluno.contato:
-                recipient_email = aluno.contato
+            if aluno and aluno.usuario and aluno.usuario.email:
+                recipient_email = aluno.usuario.email
         except Exception:
             recipient_email = None
 
         if recipient_email:
+            assunto = f"Documento reprovado: {doc.nome_arquivo}"
             mensagem = f"Seu documento '{doc.nome_arquivo}' foi reprovado pelo supervisor {supervisor_obj.nome}.\n\n"
             if observacoes:
                 mensagem += f"Observações:\n{observacoes}\n\n"
             mensagem += "Por favor, acesse o sistema para mais detalhes."
-            enviar_notificacao_email(destinatario=recipient_email, assunto=f"Documento reprovado: {doc.nome_arquivo}", mensagem=mensagem)
+            enviar_notificacao_email(destinatario=recipient_email, assunto=assunto, mensagem=mensagem)
+            # Criar notificação no sistema
+            try:
+                Notificacao.objects.get_or_create(
+                    destinatario=recipient_email,
+                    assunto=assunto,
+                    referencia=f"doc_reprovado_{doc.id}",
+                    defaults={'mensagem': mensagem}
+                )
+            except Exception as e:
+                logger.warning(f"Erro ao criar notificação: {str(e)}")
 
         messages.success(request, "Documento reprovado e observações registradas.")
         return redirect('estagio_detalhe', estagio_id=doc.estagio.id)
@@ -606,8 +641,8 @@ def supervisor_validar_documento(request, documento_id):
         recipient = None
         try:
             aluno = Aluno.objects.get(estagio=doc.estagio)
-            if aluno and aluno.contato:
-                recipient = aluno.contato
+            if aluno and aluno.usuario and aluno.usuario.email:
+                recipient = aluno.usuario.email
         except Exception:
             recipient = None
 
@@ -618,6 +653,16 @@ def supervisor_validar_documento(request, documento_id):
                 texto += f"Observações:\n{observacoes}\n\n"
             texto += "Acesse o sistema para mais detalhes."
             enviar_notificacao_email(destinatario=recipient, assunto=assunto, mensagem=texto)
+            # Criar notificação no sistema
+            try:
+                Notificacao.objects.get_or_create(
+                    destinatario=recipient,
+                    assunto=assunto,
+                    referencia=f"doc_{acao}_{doc.id}",
+                    defaults={'mensagem': texto}
+                )
+            except Exception as e:
+                logger.warning(f"Erro ao criar notificação: {str(e)}")
 
         messages.success(request, f"Documento {acao} com sucesso.")
         return redirect('estagio_detalhe', estagio_id=doc.estagio.id)
@@ -928,19 +973,19 @@ def listar_notificacoes(request):
     """View para listar as notificações do usuário logado"""
     try:
         usuario = Usuario.objects.get(id=request.user.id)
-        # Busca o aluno vinculado ao usuário para obter o email (contato)
+        # Busca o aluno vinculado ao usuário para obter o email
         try:
             aluno = Aluno.objects.get(usuario=usuario)
-            email_destinatario = aluno.contato
+            email_destinatario = aluno.usuario.email
         except Aluno.DoesNotExist:
             # Se não for aluno, tenta buscar como supervisor ou coordenador
             try:
                 supervisor = Supervisor.objects.get(usuario=usuario)
-                email_destinatario = supervisor.contato
+                email_destinatario = supervisor.usuario.email
             except Supervisor.DoesNotExist:
                 try:
                     coordenador = CursoCoordenador.objects.get(usuario=usuario)
-                    email_destinatario = coordenador.contato
+                    email_destinatario = coordenador.usuario.email
                 except CursoCoordenador.DoesNotExist:
                     email_destinatario = usuario.email
         
@@ -1009,6 +1054,7 @@ def api_notificacoes(request):
         
         data = {
             'count': notificacoes.count(),
+            'total': notificacoes.count(),
             'notificacoes': [
                 {
                     'id': n.id,
@@ -1020,9 +1066,37 @@ def api_notificacoes(request):
             ]
         }
     except Usuario.DoesNotExist:
-        data = {'count': 0, 'notificacoes': []}
+        data = {'count': 0, 'total': 0, 'notificacoes': []}
     
     return JsonResponse(data)
+
+
+@login_required
+def api_contar_notificacoes_nao_lidas(request):
+    """API que retorna o número de notificações - para badge na navbar"""
+    try:
+        usuario = Usuario.objects.get(id=request.user.id)
+        # Busca o email do usuário conforme seu tipo
+        try:
+            aluno = Aluno.objects.get(usuario=usuario)
+            email_destinatario = aluno.contato
+        except Aluno.DoesNotExist:
+            try:
+                supervisor = Supervisor.objects.get(usuario=usuario)
+                email_destinatario = supervisor.contato
+            except Supervisor.DoesNotExist:
+                try:
+                    coordenador = CursoCoordenador.objects.get(usuario=usuario)
+                    email_destinatario = coordenador.contato
+                except CursoCoordenador.DoesNotExist:
+                    email_destinatario = usuario.email
+        
+        # Conta todas as notificações não deletadas
+        count = Notificacao.objects.filter(destinatario=email_destinatario).count()
+        
+        return JsonResponse({'count': count})
+    except Usuario.DoesNotExist:
+        return JsonResponse({'count': 0})
 
 
 @login_required
@@ -1195,3 +1269,125 @@ def consultar_horas(request):
         'horas_obrigatorias': horas_obrigatorias,
         'horas_pendentes': horas_pendentes
     })
+
+
+# ============================================
+# Feedback do Supervisor - Views (Tasks 20939-20943)
+# ============================================
+
+@login_required
+@supervisor_required
+def enviar_feedback_aluno(request, aluno_id=None):
+    """View para o supervisor enviar feedback para um aluno específico.
+    
+    GET: Exibe lista de alunos supervisionados ou formulário para enviar feedback
+    POST: Registra o feedback no banco de dados e notifica o aluno por email
+    
+    Task 20939 - Criar tela de envio de feedbacks
+    Task 20940 - Registrar data e nome do supervisor
+    Task 20943 - Enviar notificação por email ao aluno
+    """
+    try:
+        supervisor_obj = Supervisor.objects.get(usuario=request.user)
+    except Supervisor.DoesNotExist:
+        messages.error(request, "Permissão negada. Você não é um supervisor.")
+        return redirect('dashboard')
+    
+    # Se aluno_id fornecido, trata como POST (envio de feedback)
+    if aluno_id and request.method == 'POST':
+        try:
+            aluno = Aluno.objects.get(id=aluno_id)
+            # Verificar se o aluno está sob supervisão deste supervisor (via estagio do aluno)
+            if not aluno.estagio or aluno.estagio.supervisor != supervisor_obj:
+                messages.error(request, "Você não tem permissão para enviar feedback a este aluno.")
+                return redirect('enviar_feedback_aluno')
+            
+            conteudo = request.POST.get('conteudo', '').strip()
+            if not conteudo:
+                messages.warning(request, "O feedback não pode estar vazio.")
+                return render(request, 'estagio/enviar_feedback.html', {
+                    'aluno': aluno,
+                    'alunos_supervisionados': get_alunos_supervisionados(supervisor_obj),
+                    'form_mode': 'edit'
+                })
+            
+            estagio = aluno.estagio
+            if not estagio:
+                messages.error(request, "Nenhum estágio encontrado para este aluno.")
+                return redirect('enviar_feedback_aluno')
+            
+            # Criar feedback
+            feedback = FeedbackSupervisor.objects.create(
+                aluno=aluno,
+                supervisor=supervisor_obj,
+                estagio=estagio,
+                conteudo=conteudo
+            )
+            
+            # Enviar notificação por email ao aluno
+            try:
+                email_aluno = aluno.contato or aluno.usuario.email
+                if email_aluno:
+                    assunto = f"Novo Feedback do Supervisor {supervisor_obj.nome}"
+                    mensagem = (
+                        f"Você recebeu um novo feedback do supervisor {supervisor_obj.nome}:\n\n"
+                        f"Estágio: {estagio.titulo}\n"
+                        f"Data: {feedback.data_feedback.strftime('%d/%m/%Y às %H:%M')}\n\n"
+                        f"Feedback:\n{conteudo}\n\n"
+                        "Acesse o sistema para visualizar seu histórico de feedbacks."
+                    )
+                    enviar_notificacao_email(
+                        destinatario=email_aluno,
+                        assunto=assunto,
+                        mensagem=mensagem
+                    )
+                    
+                    # Registrar notificação no banco
+                    Notificacao.objects.get_or_create(
+                        destinatario=email_aluno,
+                        assunto=assunto,
+                        referencia=f"feedback_{feedback.id}",
+                        defaults={'mensagem': mensagem}
+                    )
+            except Exception as e:
+                logger.warning(f"Erro ao enviar email de feedback: {str(e)}")
+                messages.warning(request, "Feedback registrado, mas ocorreu erro ao enviar notificação por email.")
+            
+            messages.success(request, f"Feedback enviado com sucesso para {aluno.nome}.")
+            return redirect('enviar_feedback_aluno')
+            
+        except Aluno.DoesNotExist:
+            messages.error(request, "Aluno não encontrado.")
+            return redirect('enviar_feedback_aluno')
+    
+    # GET: Exibir lista de alunos ou formulário
+    if aluno_id:
+        try:
+            aluno = Aluno.objects.get(id=aluno_id)
+            if not aluno.estagio or aluno.estagio.supervisor != supervisor_obj:
+                messages.error(request, "Você não tem permissão para enviar feedback a este aluno.")
+                return redirect('enviar_feedback_aluno')
+            
+            return render(request, 'estagio/enviar_feedback.html', {
+                'aluno': aluno,
+                'alunos_supervisionados': get_alunos_supervisionados(supervisor_obj),
+                'form_mode': 'edit'
+            })
+        except Aluno.DoesNotExist:
+            messages.error(request, "Aluno não encontrado.")
+            return redirect('enviar_feedback_aluno')
+    
+    # Retornar lista de alunos supervisionados
+    alunos_supervisionados = get_alunos_supervisionados(supervisor_obj)
+    return render(request, 'estagio/enviar_feedback.html', {
+        'alunos_supervisionados': alunos_supervisionados,
+        'form_mode': 'select'
+    })
+
+
+def get_alunos_supervisionados(supervisor):
+    """Retorna lista de alunos únicos supervisionados por este supervisor."""
+    alunos = Aluno.objects.filter(
+        estagio__supervisor=supervisor
+    ).distinct().select_related('usuario', 'estagio')
+    return alunos

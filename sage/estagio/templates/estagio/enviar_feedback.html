@@ -1,0 +1,549 @@
+{% extends 'base.html' %}
+
+{% block title %}Enviar Feedback - SAGE{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <div>
+            <h1><i class="fas fa-comment-medical"></i> Enviar Feedback para Aluno</h1>
+            <p class="page-subtitle">Registre feedbacks e avaliações sobre o desempenho do aluno em estágio</p>
+        </div>
+    </div>
+
+    {% if messages %}
+    <div class="messages-container" style="margin-bottom: 1.5rem;">
+        {% for message in messages %}
+        <div class="alert {% if message.tags == 'success' %}alert-success{% elif message.tags == 'error' %}alert-error{% elif message.tags == 'warning' %}alert-warning{% else %}alert-info{% endif %}">
+            {% if message.tags == 'success' %}
+                <i class="fas fa-check-circle"></i>
+            {% elif message.tags == 'error' %}
+                <i class="fas fa-exclamation-circle"></i>
+            {% elif message.tags == 'warning' %}
+                <i class="fas fa-info-circle"></i>
+            {% else %}
+                <i class="fas fa-info-circle"></i>
+            {% endif %}
+            <span>{{ message }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if form_mode == 'select' %}
+        <!-- MODO SELEÇÃO: Listar alunos supervisionados -->
+        {% if alunos_supervisionados %}
+        <div class="alunos-grid">
+            <h2 style="margin-bottom: 1.5rem; color: var(--text-dark);">
+                <i class="fas fa-users"></i> Alunos Supervisionados
+            </h2>
+            
+            <div class="alunos-list">
+                {% for aluno in alunos_supervisionados %}
+                <div class="aluno-card">
+                    <div class="aluno-header">
+                        <div class="aluno-avatar">
+                            <i class="fas fa-user-graduate"></i>
+                        </div>
+                        <div class="aluno-info">
+                            <h3 class="aluno-nome">{{ aluno.nome }}</h3>
+                            <p class="aluno-matricula">
+                                <i class="fas fa-id-card"></i> {{ aluno.usuario.username }}
+                            </p>
+                            {% if aluno.contato %}
+                            <p class="aluno-email">
+                                <i class="fas fa-envelope"></i> {{ aluno.contato }}
+                            </p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="aluno-estagios">
+                        <strong>Estágios:</strong>
+                        <ul>
+                            {% if aluno.estagio %}
+                            <li>{{ aluno.estagio.titulo }} ({{ aluno.estagio.get_status_display }})</li>
+                            {% else %}
+                            <li><em>Sem estágios ativos</em></li>
+                            {% endif %}
+                        </ul>
+                    </div>
+                    
+                    <div class="aluno-actions">
+                        <a href="{% url 'enviar_feedback_aluno_especifico' aluno.id %}" class="btn btn-primary">
+                            <i class="fas fa-pen"></i> Enviar Feedback
+                        </a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="fas fa-inbox"></i>
+            <h2>Nenhum aluno supervisionado</h2>
+            <p>Você não possui alunos supervisionados no momento. Quando houver alunos sob sua supervisão, você poderá enviar feedbacks aqui.</p>
+            <a href="{% url 'dashboard' %}" class="btn btn-secondary">
+                <i class="fas fa-home"></i> Voltar ao Painel
+            </a>
+        </div>
+        {% endif %}
+
+    {% elif form_mode == 'edit' %}
+        <!-- MODO EDIÇÃO: Formulário de envio de feedback -->
+        <div class="feedback-form-container">
+            <div class="feedback-form-card">
+                <div class="feedback-form-header">
+                    <div class="aluno-info-compact">
+                        <div class="aluno-avatar-small">
+                            <i class="fas fa-user-graduate"></i>
+                        </div>
+                        <div>
+                            <h2>{{ aluno.nome }}</h2>
+                            <p class="secondary">{{ aluno.usuario.username }}</p>
+                            {% if aluno.contato %}
+                            <p class="secondary">{{ aluno.contato }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <form method="POST" class="feedback-form">
+                    {% csrf_token %}
+                    
+                    <div class="form-group">
+                        <label for="conteudo">
+                            <i class="fas fa-comment"></i> Seu Feedback *
+                        </label>
+                        <textarea 
+                            id="conteudo" 
+                            name="conteudo" 
+                            required 
+                            rows="8"
+                            placeholder="Digite seu feedback detalhado sobre o desempenho do aluno. Inclua pontos positivos, áreas de melhoria e recomendações específicas."
+                            class="form-control"
+                            style="font-family: inherit; resize: vertical;"
+                        ></textarea>
+                        <small class="form-text">Campo obrigatório. Mínimo de 10 caracteres recomendado.</small>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-paper-plane"></i> Enviar Feedback
+                        </button>
+                        <a href="{% url 'enviar_feedback_aluno' %}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Cancelar
+                        </a>
+                    </div>
+                </form>
+
+                <!-- Feedbacks anteriores -->
+                {% if aluno.feedbacks.all %}
+                <div class="previous-feedbacks" style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid #e5e7eb;">
+                    <h3 style="margin-bottom: 1rem;">
+                        <i class="fas fa-history"></i> Feedbacks Anteriores
+                    </h3>
+                    <div class="feedbacks-history">
+                        {% for feedback in aluno.feedbacks.all %}
+                        <div class="feedback-history-item">
+                            <div class="feedback-history-header">
+                                <span class="feedback-date">
+                                    <i class="fas fa-calendar"></i> 
+                                    {{ feedback.data_feedback|date:"d/m/Y H:i" }}
+                                </span>
+                                <span class="feedback-supervisor">
+                                    Por: {{ feedback.supervisor.nome }}
+                                </span>
+                            </div>
+                            <p class="feedback-content">{{ feedback.conteudo|truncatewords:50 }}</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<style>
+    .page-container {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 2rem;
+    }
+
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 2rem;
+    }
+
+    .page-header h1 {
+        font-size: 1.875rem;
+        font-weight: 700;
+        color: var(--text-dark);
+        margin-bottom: 0.25rem;
+    }
+
+    .page-subtitle {
+        color: var(--text-gray);
+        font-size: 1rem;
+        margin: 0;
+    }
+
+    .messages-container {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .alert {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 1rem;
+        border-radius: 8px;
+        font-size: 0.95rem;
+    }
+
+    .alert-success {
+        background-color: #D1FAE5;
+        color: #065F46;
+        border: 1px solid #A7F3D0;
+    }
+
+    .alert-error {
+        background-color: #FEE2E2;
+        color: #991B1B;
+        border: 1px solid #FECACA;
+    }
+
+    .alert-warning {
+        background-color: #FEF3C7;
+        color: #92400E;
+        border: 1px solid #FCD34D;
+    }
+
+    .alert-info {
+        background-color: #DBEAFE;
+        color: #1E40AF;
+        border: 1px solid #BFDBFE;
+    }
+
+    .alunos-grid {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .alunos-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+        gap: 1.5rem;
+    }
+
+    .aluno-card {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 1.5rem;
+        transition: all 0.3s ease;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .aluno-card:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        border-color: #667eea;
+    }
+
+    .aluno-header {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .aluno-avatar {
+        width: 56px;
+        height: 56px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.5rem;
+        flex-shrink: 0;
+    }
+
+    .aluno-info {
+        flex: 1;
+    }
+
+    .aluno-nome {
+        margin: 0 0 0.25rem 0;
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: var(--text-dark);
+    }
+
+    .aluno-matricula,
+    .aluno-email {
+        margin: 0.25rem 0;
+        font-size: 0.875rem;
+        color: var(--text-gray);
+    }
+
+    .aluno-estagios {
+        margin: 1rem 0;
+        padding: 0.75rem;
+        background: #f9fafb;
+        border-radius: 8px;
+        font-size: 0.875rem;
+    }
+
+    .aluno-estagios ul {
+        margin: 0.5rem 0 0 0;
+        padding-left: 1.5rem;
+    }
+
+    .aluno-estagios li {
+        margin: 0.25rem 0;
+        color: var(--text-gray);
+    }
+
+    .aluno-actions {
+        display: flex;
+        gap: 0.75rem;
+        margin-top: 1rem;
+    }
+
+    .feedback-form-container {
+        display: flex;
+        justify-content: center;
+    }
+
+    .feedback-form-card {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 2rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        width: 100%;
+        max-width: 800px;
+    }
+
+    .feedback-form-header {
+        margin-bottom: 2rem;
+        padding-bottom: 1.5rem;
+        border-bottom: 2px solid #f3f4f6;
+    }
+
+    .aluno-info-compact {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .aluno-avatar-small {
+        width: 64px;
+        height: 64px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 2rem;
+        flex-shrink: 0;
+    }
+
+    .aluno-info-compact h2 {
+        margin: 0 0 0.5rem 0;
+        font-size: 1.5rem;
+        color: var(--text-dark);
+    }
+
+    .secondary {
+        margin: 0.25rem 0;
+        color: var(--text-gray);
+        font-size: 0.95rem;
+    }
+
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 0.5rem;
+        font-weight: 600;
+        color: var(--text-dark);
+        font-size: 0.95rem;
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 0.75rem;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        font-size: 0.95rem;
+        transition: all 0.2s ease;
+    }
+
+    .form-control:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .form-text {
+        display: block;
+        margin-top: 0.5rem;
+        color: #6b7280;
+        font-size: 0.85rem;
+    }
+
+    .form-actions {
+        display: flex;
+        gap: 1rem;
+        margin-top: 2rem;
+    }
+
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1.5rem;
+        border: none;
+        border-radius: 8px;
+        font-size: 0.95rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-decoration: none;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-success {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+    }
+
+    .btn-success:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+    }
+
+    .btn-secondary {
+        background: #f3f4f6;
+        color: var(--text-dark);
+        border: 1px solid #d1d5db;
+    }
+
+    .btn-secondary:hover {
+        background: #e5e7eb;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 3rem 2rem;
+        background: #f9fafb;
+        border-radius: 12px;
+    }
+
+    .empty-state i {
+        font-size: 3rem;
+        color: #d1d5db;
+        margin-bottom: 1rem;
+    }
+
+    .empty-state h2 {
+        margin: 1rem 0 0.5rem 0;
+        color: var(--text-dark);
+    }
+
+    .empty-state p {
+        color: var(--text-gray);
+        margin-bottom: 1.5rem;
+    }
+
+    .previous-feedbacks {
+        background: #f9fafb;
+        padding: 1.5rem;
+        border-radius: 8px;
+    }
+
+    .feedbacks-history {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .feedback-history-item {
+        background: white;
+        padding: 1rem;
+        border-radius: 8px;
+        border-left: 4px solid #667eea;
+    }
+
+    .feedback-history-header {
+        display: flex;
+        gap: 1rem;
+        justify-content: space-between;
+        margin-bottom: 0.75rem;
+        flex-wrap: wrap;
+    }
+
+    .feedback-date,
+    .feedback-supervisor {
+        font-size: 0.85rem;
+        color: var(--text-gray);
+    }
+
+    .feedback-content {
+        margin: 0;
+        color: var(--text-dark);
+        font-size: 0.95rem;
+        line-height: 1.5;
+    }
+
+    @media (max-width: 768px) {
+        .page-header {
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .alunos-list {
+            grid-template-columns: 1fr;
+        }
+
+        .feedback-form-card {
+            padding: 1.5rem;
+        }
+
+        .aluno-info-compact {
+            flex-direction: column;
+            text-align: center;
+        }
+
+        .form-actions {
+            flex-direction: column;
+        }
+
+        .btn {
+            width: 100%;
+        }
+    }
+</style>
+{% endblock %}

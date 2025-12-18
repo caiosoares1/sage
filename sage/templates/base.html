@@ -70,8 +70,9 @@
                     <a href="{% url 'listar_feedbacks' %}" class="nav-item {% block nav_feedbacks %}{% endblock %}">
                         <i class="fas fa-comments"></i> Feedbacks
                     </a>
-                    <a href="{% url 'listar_notificacoes' %}" class="nav-item {% block nav_notificacoes %}{% endblock %}">
+                    <a href="{% url 'listar_notificacoes' %}" class="nav-item nav-notificacoes {% block nav_notificacoes %}{% endblock %}" id="nav-notificacoes-link">
                         <i class="fas fa-bell"></i> Notificações
+                        <span class="notification-badge" id="notification-badge" style="display: none;"></span>
                     </a>
                     <a href="{% url 'editar_dados_aluno' %}" class="nav-item {% block nav_perfil %}{% endblock %}">
                         <i class="fas fa-user-edit"></i> Meus Dados
@@ -85,6 +86,9 @@
                     </a>
                     <a href="{% url 'supervisor_ver_horas' %}" class="nav-item {% block nav_supervisor_horas %}{% endblock %}">
                         <i class="fas fa-user-clock"></i> Horas dos Alunos
+                    </a>
+                    <a href="{% url 'enviar_feedback_aluno' %}" class="nav-item {% block nav_enviar_feedback %}{% endblock %}">
+                        <i class="fas fa-comment-medical"></i> Enviar Feedback
                     </a>
                 {% endif %}
                 
@@ -121,6 +125,70 @@
     </footer>
 
     <script src="{% static 'js/script.js' %}"></script>
+    
+    <!-- Notificações Badge Script -->
+    <style>
+        .notification-badge {
+            position: absolute;
+            background: #ef4444;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-left: 2px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+            }
+            50% {
+                box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
+            }
+        }
+
+        .nav-notificacoes {
+            position: relative;
+        }
+    </style>
+
+    <script>
+        // Função para atualizar contador de notificações
+        function atualizarBadgeNotificacoes() {
+            fetch('{% url "api_contar_notificacoes_nao_lidas" %}')
+                .then(response => response.json())
+                .then(data => {
+                    const badge = document.getElementById('notification-badge');
+                    if (data.count > 0) {
+                        badge.textContent = data.count > 9 ? '9+' : data.count;
+                        badge.style.display = 'flex';
+                    } else {
+                        badge.style.display = 'none';
+                    }
+                })
+                .catch(error => console.error('Erro ao contar notificações:', error));
+        }
+
+        // Atualizar na carga da página
+        document.addEventListener('DOMContentLoaded', atualizarBadgeNotificacoes);
+
+        // Atualizar a cada 30 segundos
+        setInterval(atualizarBadgeNotificacoes, 30000);
+
+        // Atualizar quando voltar para a página (visibilidade)
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) {
+                atualizarBadgeNotificacoes();
+            }
+        });
+    </script>
+    
     {% block extra_js %}{% endblock %}
 </body>
 </html>
