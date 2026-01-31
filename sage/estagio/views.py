@@ -1464,3 +1464,1220 @@ def get_alunos_supervisionados(supervisor):
         estagio__supervisor=supervisor
     ).distinct().select_related('usuario', 'estagio')
     return alunos
+
+
+# ==================== VIEWS DE CONSULTA DE PARECER - CA6 ====================
+
+@login_required
+@aluno_required
+def listar_pareceres_aluno(request):
+    """
+    CA6 - View para aluno listar seus pareceres disponíveis para consulta.
+    Lista todas as avaliações com parecer emitido e disponível para consulta.
+    """
+    from estagio.models import Avaliacao
+    
+    try:
+        usuario = Usuario.objects.get(id=request.user.id)
+        aluno = Aluno.objects.get(usuario=usuario)
+        
+        # Busca avaliações com parecer disponível para consulta
+        avaliacoes_com_parecer = Avaliacao.objects.filter(
+            aluno=aluno,
+            status='parecer_emitido',
+            parecer_disponivel_consulta=True
+        ).select_related(
+            'supervisor',
+            'estagio__empresa'
+        ).order_by('-data_emissao_parecer')
+        
+        # Estatísticas
+        total_pareceres = avaliacoes_com_parecer.count()
+        if total_pareceres > 0:
+            media_notas = sum(a.nota_final for a in avaliacoes_com_parecer if a.nota_final) / total_pareceres
+        else:
+            media_notas = None
+        
+        context = {
+            'avaliacoes': avaliacoes_com_parecer,
+            'aluno': aluno,
+            'total_pareceres': total_pareceres,
+            'media_notas': media_notas,
+        }
+        return render(request, 'estagio/listar_pareceres.html', context)
+        
+    except (Usuario.DoesNotExist, Aluno.DoesNotExist):
+        messages.error(request, "Aluno não encontrado!")
+        return redirect('dashboard')
+
+
+@login_required
+@aluno_required
+def consultar_parecer(request, avaliacao_id):
+    """
+    CA6 - View para aluno consultar o parecer final de uma avaliação específica.
+    
+    BDD:
+    DADO que a avaliação foi concluída
+    QUANDO o supervisor emitir o parecer final
+    ENTÃO o sistema deve gerar a nota e o parecer do estagiário
+    (Esta view permite a consulta pelo aluno após emissão)
+    """
+    from estagio.models import Avaliacao
+    
+    try:
+        usuario = Usuario.objects.get(id=request.user.id)
+        aluno = Aluno.objects.get(usuario=usuario)
+        
+        # Busca avaliação garantindo que pertence ao aluno e está disponível
+        avaliacao = get_object_or_404(
+            Avaliacao.objects.select_related(
+                'supervisor',
+                'estagio__empresa'
+            ).prefetch_related(
+                'notas_criterios__criterio'
+            ),
+            id=avaliacao_id,
+            aluno=aluno
+        )
+        
+        # Verifica se o parecer foi emitido e está disponível
+        if avaliacao.status != 'parecer_emitido':
+            messages.warning(request, 'O parecer desta avaliação ainda não foi emitido.')
+            return redirect('listar_pareceres_aluno')
+        
+        if not avaliacao.parecer_disponivel_consulta:
+            messages.warning(request, 'O parecer desta avaliação não está disponível para consulta.')
+            return redirect('listar_pareceres_aluno')
+        
+        # CA6 - Obtém dados do parecer para consulta
+        parecer_dados = avaliacao.get_parecer_para_consulta()
+        
+        # Notas por critério (para exibição detalhada)
+        notas_criterios = avaliacao.notas_criterios.all().order_by('criterio__ordem')
+        
+        context = {
+            'avaliacao': avaliacao,
+            'parecer_dados': parecer_dados,
+            'notas_criterios': notas_criterios,
+            'aluno': aluno,
+        }
+        return render(request, 'estagio/consultar_parecer.html', context)
+        
+    except (Usuario.DoesNotExist, Aluno.DoesNotExist):
+        messages.error(request, "Aluno não encontrado!")
+        return redirect('dashboard')
+
+
+# ==================== PAINEL DE STATUS DE ESTÁGIOS ====================
+
+@login_required
+def painel_estagios(request):
+    """
+    View para exibição do painel de status dos estágios.
+    
+    US: Visualização em painel dos status dos estágios
+    CA1 - O sistema deve permitir a exibição de estágios por status
+    CA3 - O sistema deve ter acesso restrito conforme perfil do usuário
+    
+    BDD:
+    DADO que existem estágios cadastrados
+    QUANDO o usuário acessar o painel
+    ENTÃO deve visualizar o status atualizado dos estágios
+    """
+    usuario = request.user
+    
+    # CA3 - Controle de acesso por perfil
+    estagios = _filtrar_estagios_por_perfil(usuario)
+    
+    # CA1 - Agrupamento por status
+    estagios_por_status = _agrupar_estagios_por_status(estagios)
+    
+    # Estatísticas gerais
+    estatisticas = _calcular_estatisticas_estagios(estagios)
+    
+    # Filtros aplicados
+    filtro_status = request.GET.get('status', '')
+    if filtro_status:
+        estagios = estagios.filter(status=filtro_status)
+    
+    filtro_empresa = request.GET.get('empresa', '')
+    if filtro_empresa:
+        estagios = estagios.filter(empresa__razao_social__icontains=filtro_empresa)
+    
+    context = {
+        'estagios': estagios.order_by('-data_solicitacao'),
+        'estagios_por_status': estagios_por_status,
+        'estatisticas': estatisticas,
+        'status_choices': Estagio.STATUS_CHOICES,
+        'filtro_status': filtro_status,
+        'filtro_empresa': filtro_empresa,
+        'perfil_usuario': usuario.tipo,
+    }
+    return render(request, 'estagio/painel_estagios.html', context)
+
+
+@login_required
+def api_painel_estagios(request):
+    """
+    API para atualização automática do painel de estágios.
+    
+    US: Visualização em painel dos status dos estágios
+    CA2 - O sistema deve permitir a atualização automática das informações
+    CA3 - O sistema deve ter acesso restrito conforme perfil do usuário
+    
+    Retorna dados JSON para atualização via AJAX/polling.
+    """
+    usuario = request.user
+    
+    # CA3 - Controle de acesso por perfil
+    estagios = _filtrar_estagios_por_perfil(usuario)
+    
+    # CA1 - Agrupamento por status
+    estagios_por_status = _agrupar_estagios_por_status(estagios)
+    
+    # Estatísticas
+    estatisticas = _calcular_estatisticas_estagios(estagios)
+    
+    # CA2 - Dados para atualização automática
+    dados = {
+        'timestamp': timezone.now().isoformat(),
+        'estatisticas': estatisticas,
+        'estagios_por_status': {
+            status: list(qs.values('id', 'titulo', 'status', 'empresa__razao_social', 'data_inicio', 'data_fim'))
+            for status, qs in estagios_por_status.items()
+        },
+        'total_estagios': estagios.count(),
+    }
+    
+    return JsonResponse(dados)
+
+
+@login_required
+def api_estatisticas_estagios(request):
+    """
+    API para obter estatísticas dos estágios em tempo real.
+    
+    CA2 - O sistema deve permitir a atualização automática das informações
+    CA3 - O sistema deve ter acesso restrito conforme perfil do usuário
+    """
+    usuario = request.user
+    
+    # CA3 - Controle de acesso por perfil
+    estagios = _filtrar_estagios_por_perfil(usuario)
+    
+    estatisticas = _calcular_estatisticas_estagios(estagios)
+    estatisticas['timestamp'] = timezone.now().isoformat()
+    
+    return JsonResponse(estatisticas)
+
+
+@login_required
+def api_estagios_por_status(request, status):
+    """
+    API para obter estágios filtrados por status específico.
+    
+    CA1 - O sistema deve permitir a exibição de estágios por status
+    CA2 - O sistema deve permitir a atualização automática das informações
+    CA3 - O sistema deve ter acesso restrito conforme perfil do usuário
+    """
+    usuario = request.user
+    
+    # Valida status
+    status_validos = [s[0] for s in Estagio.STATUS_CHOICES]
+    if status not in status_validos:
+        return JsonResponse({'error': 'Status inválido'}, status=400)
+    
+    # CA3 - Controle de acesso por perfil
+    estagios = _filtrar_estagios_por_perfil(usuario)
+    
+    # CA1 - Filtra por status
+    estagios_filtrados = estagios.filter(status=status)
+    
+    dados = {
+        'status': status,
+        'status_display': dict(Estagio.STATUS_CHOICES).get(status),
+        'total': estagios_filtrados.count(),
+        'estagios': list(estagios_filtrados.values(
+            'id', 'titulo', 'cargo', 'empresa__razao_social',
+            'data_inicio', 'data_fim', 'carga_horaria'
+        )),
+        'timestamp': timezone.now().isoformat(),
+    }
+    
+    return JsonResponse(dados)
+
+
+def _filtrar_estagios_por_perfil(usuario):
+    """
+    Função auxiliar para filtrar estágios conforme perfil do usuário.
+    
+    CA3 - O sistema deve ter acesso restrito conforme perfil do usuário
+    
+    Retorna:
+    - Coordenador: todos os estágios
+    - Supervisor: apenas estágios que supervisiona
+    - Aluno: apenas seus próprios estágios
+    """
+    if usuario.tipo == 'coordenador':
+        # Coordenador vê todos os estágios
+        return Estagio.objects.all()
+    
+    elif usuario.tipo == 'supervisor':
+        # Supervisor vê apenas estágios que supervisiona
+        try:
+            supervisor = Supervisor.objects.get(usuario=usuario)
+            return Estagio.objects.filter(supervisor=supervisor)
+        except Supervisor.DoesNotExist:
+            return Estagio.objects.none()
+    
+    elif usuario.tipo == 'aluno':
+        # Aluno vê apenas seus próprios estágios
+        try:
+            aluno = Aluno.objects.get(usuario=usuario)
+            return Estagio.objects.filter(aluno_solicitante=aluno)
+        except Aluno.DoesNotExist:
+            return Estagio.objects.none()
+    
+    # Perfil não reconhecido - sem acesso
+    return Estagio.objects.none()
+
+
+def _agrupar_estagios_por_status(estagios):
+    """
+    Função auxiliar para agrupar estágios por status.
+    
+    CA1 - O sistema deve permitir a exibição de estágios por status
+    """
+    return {
+        'analise': estagios.filter(status='analise'),
+        'em_andamento': estagios.filter(status='em_andamento'),
+        'aprovado': estagios.filter(status='aprovado'),
+        'reprovado': estagios.filter(status='reprovado'),
+    }
+
+
+def _calcular_estatisticas_estagios(estagios):
+    """
+    Função auxiliar para calcular estatísticas dos estágios.
+    
+    CA1 - Estatísticas por status para exibição no painel
+    """
+    total = estagios.count()
+    
+    estatisticas = {
+        'total': total,
+        'analise': estagios.filter(status='analise').count(),
+        'em_andamento': estagios.filter(status='em_andamento').count(),
+        'aprovado': estagios.filter(status='aprovado').count(),
+        'reprovado': estagios.filter(status='reprovado').count(),
+    }
+    
+    # Percentuais
+    if total > 0:
+        estatisticas['percentual_analise'] = round((estatisticas['analise'] / total) * 100, 1)
+        estatisticas['percentual_em_andamento'] = round((estatisticas['em_andamento'] / total) * 100, 1)
+        estatisticas['percentual_aprovado'] = round((estatisticas['aprovado'] / total) * 100, 1)
+        estatisticas['percentual_reprovado'] = round((estatisticas['reprovado'] / total) * 100, 1)
+    else:
+        estatisticas['percentual_analise'] = 0
+        estatisticas['percentual_em_andamento'] = 0
+        estatisticas['percentual_aprovado'] = 0
+        estatisticas['percentual_reprovado'] = 0
+    
+    return estatisticas
+
+
+# ==================== MONITORAMENTO DE PENDÊNCIAS E RESULTADOS ====================
+
+# Constantes para tipos de pendência
+TIPOS_PENDENCIA = {
+    'documento_pendente': {
+        'nome': 'Documento Pendente',
+        'descricao': 'Documentos aguardando envio ou correção',
+        'critico': False,
+    },
+    'documento_ajuste': {
+        'nome': 'Documento com Ajustes Solicitados',
+        'descricao': 'Documentos que precisam de correção',
+        'critico': True,
+    },
+    'documento_prazo': {
+        'nome': 'Documento com Prazo Próximo',
+        'descricao': 'Documentos com prazo de vencimento próximo',
+        'critico': True,
+    },
+    'avaliacao_pendente': {
+        'nome': 'Avaliação Pendente',
+        'descricao': 'Avaliações aguardando preenchimento',
+        'critico': False,
+    },
+    'avaliacao_incompleta': {
+        'nome': 'Avaliação Incompleta',
+        'descricao': 'Avaliações com critérios não preenchidos',
+        'critico': True,
+    },
+    'estagio_analise': {
+        'nome': 'Estágio em Análise',
+        'descricao': 'Estágios aguardando aprovação',
+        'critico': False,
+    },
+    'horas_insuficientes': {
+        'nome': 'Horas Insuficientes',
+        'descricao': 'Alunos com horas abaixo do esperado',
+        'critico': True,
+    },
+}
+
+
+@login_required
+def monitoramento_pendencias(request):
+    """
+    View para monitoramento de pendências e resultados consolidados.
+    
+    US: Monitoramento de pendências e resultados
+    CA4 - O sistema deve permitir a exibição de pendências por tipo
+    CA5 - O sistema deve ter um destaque visual para pendências críticas
+    CA6 - O sistema deve permitir a visualização de resultados consolidados
+    
+    BDD:
+    DADO que há pendências e resultados registrados
+    QUANDO o usuário acessar o monitoramento
+    ENTÃO deve visualizar alertas e resultados consolidados
+    """
+    usuario = request.user
+    
+    # CA4 - Obtém pendências agrupadas por tipo
+    pendencias = _obter_pendencias_por_perfil(usuario)
+    pendencias_por_tipo = _agrupar_pendencias_por_tipo(pendencias)
+    
+    # CA5 - Identifica pendências críticas
+    pendencias_criticas = _filtrar_pendencias_criticas(pendencias)
+    
+    # CA6 - Resultados consolidados
+    resultados_consolidados = _consolidar_resultados(usuario)
+    
+    # Filtro por tipo de pendência
+    filtro_tipo = request.GET.get('tipo', '')
+    if filtro_tipo and filtro_tipo in TIPOS_PENDENCIA:
+        pendencias = [p for p in pendencias if p['tipo'] == filtro_tipo]
+    
+    # Filtro por criticidade
+    filtro_critico = request.GET.get('critico', '')
+    if filtro_critico == 'true':
+        pendencias = [p for p in pendencias if p['critico']]
+    
+    context = {
+        'pendencias': pendencias,
+        'pendencias_por_tipo': pendencias_por_tipo,
+        'pendencias_criticas': pendencias_criticas,
+        'resultados_consolidados': resultados_consolidados,
+        'tipos_pendencia': TIPOS_PENDENCIA,
+        'filtro_tipo': filtro_tipo,
+        'filtro_critico': filtro_critico,
+        'total_pendencias': len(pendencias),
+        'total_criticas': len(pendencias_criticas),
+    }
+    return render(request, 'estagio/monitoramento_pendencias.html', context)
+
+
+@login_required
+def api_monitoramento_pendencias(request):
+    """
+    API para atualização automática do monitoramento de pendências.
+    
+    CA4 - Exibição de pendências por tipo
+    CA5 - Destaque para pendências críticas
+    CA6 - Resultados consolidados
+    """
+    usuario = request.user
+    
+    # CA4 - Pendências por tipo
+    pendencias = _obter_pendencias_por_perfil(usuario)
+    pendencias_por_tipo = _agrupar_pendencias_por_tipo(pendencias)
+    
+    # CA5 - Pendências críticas
+    pendencias_criticas = _filtrar_pendencias_criticas(pendencias)
+    
+    # CA6 - Resultados consolidados
+    resultados_consolidados = _consolidar_resultados(usuario)
+    
+    dados = {
+        'timestamp': timezone.now().isoformat(),
+        'total_pendencias': len(pendencias),
+        'total_criticas': len(pendencias_criticas),
+        'pendencias_por_tipo': {
+            tipo: {
+                'quantidade': len(lista),
+                'critico': TIPOS_PENDENCIA.get(tipo, {}).get('critico', False),
+                'nome': TIPOS_PENDENCIA.get(tipo, {}).get('nome', tipo),
+            }
+            for tipo, lista in pendencias_por_tipo.items()
+        },
+        'pendencias_criticas': pendencias_criticas[:10],  # Limita a 10 mais recentes
+        'resultados_consolidados': resultados_consolidados,
+    }
+    
+    return JsonResponse(dados)
+
+
+@login_required
+def api_pendencias_por_tipo(request, tipo):
+    """
+    API para obter pendências filtradas por tipo específico.
+    
+    CA4 - O sistema deve permitir a exibição de pendências por tipo
+    """
+    usuario = request.user
+    
+    # Valida tipo
+    if tipo not in TIPOS_PENDENCIA:
+        return JsonResponse({'error': 'Tipo de pendência inválido'}, status=400)
+    
+    # Obtém pendências do tipo específico
+    pendencias = _obter_pendencias_por_perfil(usuario)
+    pendencias_filtradas = [p for p in pendencias if p['tipo'] == tipo]
+    
+    dados = {
+        'tipo': tipo,
+        'tipo_info': TIPOS_PENDENCIA[tipo],
+        'quantidade': len(pendencias_filtradas),
+        'pendencias': pendencias_filtradas,
+        'timestamp': timezone.now().isoformat(),
+    }
+    
+    return JsonResponse(dados)
+
+
+@login_required
+def api_resultados_consolidados(request):
+    """
+    API para obter resultados consolidados.
+    
+    CA6 - O sistema deve permitir a visualização de resultados consolidados
+    """
+    usuario = request.user
+    
+    resultados = _consolidar_resultados(usuario)
+    resultados['timestamp'] = timezone.now().isoformat()
+    
+    return JsonResponse(resultados)
+
+
+def _obter_pendencias_por_perfil(usuario):
+    """
+    Obtém todas as pendências conforme o perfil do usuário.
+    Retorna lista de dicionários com informações das pendências.
+    """
+    pendencias = []
+    
+    if usuario.tipo == 'coordenador':
+        pendencias.extend(_obter_pendencias_coordenador())
+    elif usuario.tipo == 'supervisor':
+        pendencias.extend(_obter_pendencias_supervisor(usuario))
+    elif usuario.tipo == 'aluno':
+        pendencias.extend(_obter_pendencias_aluno(usuario))
+    
+    # Ordena por criticidade (críticas primeiro) e depois por data
+    pendencias.sort(key=lambda x: (not x['critico'], x.get('data', '')))
+    
+    return pendencias
+
+
+def _obter_pendencias_coordenador():
+    """Obtém pendências para o perfil de coordenador"""
+    pendencias = []
+    hoje = timezone.now().date()
+    
+    # Estágios em análise aguardando aprovação
+    estagios_analise = Estagio.objects.filter(status='analise')
+    for estagio in estagios_analise:
+        pendencias.append({
+            'tipo': 'estagio_analise',
+            'titulo': f'Estágio "{estagio.titulo}" aguardando aprovação',
+            'descricao': f'Solicitado por {estagio.aluno_solicitante.nome if estagio.aluno_solicitante else "N/A"}',
+            'referencia_id': estagio.id,
+            'referencia_tipo': 'estagio',
+            'critico': False,
+            'data': estagio.data_solicitacao.isoformat() if estagio.data_solicitacao else '',
+        })
+    
+    # Documentos com prazo próximo (3 dias)
+    prazo_limite = hoje + timedelta(days=3)
+    documentos_prazo = Documento.objects.filter(
+        prazo_limite__lte=prazo_limite,
+        prazo_limite__gte=hoje,
+        status__in=['enviado', 'ajustes_solicitados', 'corrigido']
+    )
+    for doc in documentos_prazo:
+        dias_restantes = (doc.prazo_limite - hoje).days
+        pendencias.append({
+            'tipo': 'documento_prazo',
+            'titulo': f'Documento "{doc.nome_arquivo}" com prazo em {dias_restantes} dia(s)',
+            'descricao': f'Prazo: {doc.prazo_limite.strftime("%d/%m/%Y")}',
+            'referencia_id': doc.id,
+            'referencia_tipo': 'documento',
+            'critico': True,
+            'data': doc.prazo_limite.isoformat(),
+        })
+    
+    return pendencias
+
+
+def _obter_pendencias_supervisor(usuario):
+    """Obtém pendências para o perfil de supervisor"""
+    pendencias = []
+    hoje = timezone.now().date()
+    
+    try:
+        supervisor = Supervisor.objects.get(usuario=usuario)
+    except Supervisor.DoesNotExist:
+        return pendencias
+    
+    # Documentos aguardando análise do supervisor
+    documentos_pendentes = Documento.objects.filter(
+        supervisor=supervisor,
+        status__in=['enviado', 'corrigido']
+    )
+    for doc in documentos_pendentes:
+        pendencias.append({
+            'tipo': 'documento_pendente',
+            'titulo': f'Documento "{doc.nome_arquivo}" aguardando análise',
+            'descricao': f'Enviado em {doc.data_envio.strftime("%d/%m/%Y")}',
+            'referencia_id': doc.id,
+            'referencia_tipo': 'documento',
+            'critico': False,
+            'data': doc.data_envio.isoformat(),
+        })
+    
+    # Avaliações incompletas
+    from estagio.models import Avaliacao
+    avaliacoes_incompletas = Avaliacao.objects.filter(
+        supervisor=supervisor,
+        status__in=['rascunho', 'completa']
+    )
+    for avaliacao in avaliacoes_incompletas:
+        if not avaliacao.is_completa():
+            pendencias.append({
+                'tipo': 'avaliacao_incompleta',
+                'titulo': f'Avaliação de {avaliacao.aluno.nome if avaliacao.aluno else "N/A"} incompleta',
+                'descricao': f'Período: {avaliacao.get_periodo_display()}',
+                'referencia_id': avaliacao.id,
+                'referencia_tipo': 'avaliacao',
+                'critico': True,
+                'data': avaliacao.created_at.isoformat() if avaliacao.created_at else '',
+            })
+    
+    return pendencias
+
+
+def _obter_pendencias_aluno(usuario):
+    """Obtém pendências para o perfil de aluno"""
+    pendencias = []
+    hoje = timezone.now().date()
+    
+    try:
+        aluno = Aluno.objects.get(usuario=usuario)
+    except Aluno.DoesNotExist:
+        return pendencias
+    
+    # Documentos com ajustes solicitados
+    if aluno.estagio:
+        documentos_ajuste = Documento.objects.filter(
+            estagio=aluno.estagio,
+            status='ajustes_solicitados'
+        )
+        for doc in documentos_ajuste:
+            pendencias.append({
+                'tipo': 'documento_ajuste',
+                'titulo': f'Documento "{doc.nome_arquivo}" precisa de correção',
+                'descricao': doc.observacoes_supervisor or 'Verifique as observações do supervisor',
+                'referencia_id': doc.id,
+                'referencia_tipo': 'documento',
+                'critico': True,
+                'data': doc.updated_at.isoformat() if doc.updated_at else '',
+            })
+        
+        # Documentos com prazo próximo
+        prazo_limite = hoje + timedelta(days=3)
+        documentos_prazo = Documento.objects.filter(
+            estagio=aluno.estagio,
+            prazo_limite__lte=prazo_limite,
+            prazo_limite__gte=hoje,
+            status__in=['enviado', 'ajustes_solicitados']
+        )
+        for doc in documentos_prazo:
+            dias_restantes = (doc.prazo_limite - hoje).days
+            pendencias.append({
+                'tipo': 'documento_prazo',
+                'titulo': f'Documento "{doc.nome_arquivo}" vence em {dias_restantes} dia(s)',
+                'descricao': f'Prazo: {doc.prazo_limite.strftime("%d/%m/%Y")}',
+                'referencia_id': doc.id,
+                'referencia_tipo': 'documento',
+                'critico': True,
+                'data': doc.prazo_limite.isoformat(),
+            })
+    
+    return pendencias
+
+
+def _agrupar_pendencias_por_tipo(pendencias):
+    """
+    CA4 - Agrupa pendências por tipo.
+    """
+    agrupadas = {}
+    for pendencia in pendencias:
+        tipo = pendencia['tipo']
+        if tipo not in agrupadas:
+            agrupadas[tipo] = []
+        agrupadas[tipo].append(pendencia)
+    return agrupadas
+
+
+def _filtrar_pendencias_criticas(pendencias):
+    """
+    CA5 - Filtra apenas pendências críticas.
+    """
+    return [p for p in pendencias if p['critico']]
+
+
+def _consolidar_resultados(usuario):
+    """
+    CA6 - Consolida resultados para exibição.
+    
+    Retorna estatísticas consolidadas de:
+    - Estágios
+    - Documentos
+    - Avaliações
+    - Horas cumpridas
+    """
+    from estagio.models import Avaliacao
+    
+    resultados = {
+        'estagios': {},
+        'documentos': {},
+        'avaliacoes': {},
+        'horas': {},
+    }
+    
+    if usuario.tipo == 'coordenador':
+        # Coordenador vê tudo
+        estagios = Estagio.objects.all()
+        documentos = Documento.objects.all()
+        avaliacoes = Avaliacao.objects.all()
+        horas = HorasCumpridas.objects.all()
+        
+    elif usuario.tipo == 'supervisor':
+        try:
+            supervisor = Supervisor.objects.get(usuario=usuario)
+            estagios = Estagio.objects.filter(supervisor=supervisor)
+            documentos = Documento.objects.filter(supervisor=supervisor)
+            avaliacoes = Avaliacao.objects.filter(supervisor=supervisor)
+            # Horas dos alunos dos estágios que supervisiona
+            alunos_ids = estagios.values_list('aluno_solicitante_id', flat=True)
+            horas = HorasCumpridas.objects.filter(aluno_id__in=alunos_ids)
+        except Supervisor.DoesNotExist:
+            estagios = Estagio.objects.none()
+            documentos = Documento.objects.none()
+            avaliacoes = Avaliacao.objects.none()
+            horas = HorasCumpridas.objects.none()
+            
+    elif usuario.tipo == 'aluno':
+        try:
+            aluno = Aluno.objects.get(usuario=usuario)
+            estagios = Estagio.objects.filter(aluno_solicitante=aluno)
+            documentos = Documento.objects.filter(estagio__aluno_solicitante=aluno)
+            avaliacoes = Avaliacao.objects.filter(aluno=aluno)
+            horas = HorasCumpridas.objects.filter(aluno=aluno)
+        except Aluno.DoesNotExist:
+            estagios = Estagio.objects.none()
+            documentos = Documento.objects.none()
+            avaliacoes = Avaliacao.objects.none()
+            horas = HorasCumpridas.objects.none()
+    else:
+        estagios = Estagio.objects.none()
+        documentos = Documento.objects.none()
+        avaliacoes = Avaliacao.objects.none()
+        horas = HorasCumpridas.objects.none()
+    
+    # Consolidação de estágios
+    resultados['estagios'] = {
+        'total': estagios.count(),
+        'em_andamento': estagios.filter(status='em_andamento').count(),
+        'aprovados': estagios.filter(status='aprovado').count(),
+        'em_analise': estagios.filter(status='analise').count(),
+        'reprovados': estagios.filter(status='reprovado').count(),
+    }
+    
+    # Consolidação de documentos
+    resultados['documentos'] = {
+        'total': documentos.count(),
+        'aprovados': documentos.filter(status='aprovado').count(),
+        'pendentes': documentos.filter(status__in=['enviado', 'corrigido']).count(),
+        'com_ajustes': documentos.filter(status='ajustes_solicitados').count(),
+        'finalizados': documentos.filter(status='finalizado').count(),
+    }
+    
+    # Consolidação de avaliações
+    resultados['avaliacoes'] = {
+        'total': avaliacoes.count(),
+        'completas': avaliacoes.filter(status='parecer_emitido').count(),
+        'em_andamento': avaliacoes.filter(status__in=['rascunho', 'completa', 'enviada']).count(),
+        'nota_media': _calcular_nota_media_avaliacoes(avaliacoes),
+    }
+    
+    # Consolidação de horas
+    total_horas = horas.aggregate(total=Sum('quantidade'))['total'] or 0
+    resultados['horas'] = {
+        'total_registros': horas.count(),
+        'total_horas': total_horas,
+    }
+    
+    return resultados
+
+
+def _calcular_nota_media_avaliacoes(avaliacoes):
+    """Calcula a nota média das avaliações com parecer emitido"""
+    avaliacoes_com_nota = avaliacoes.filter(
+        status='parecer_emitido',
+        nota_final__isnull=False
+    )
+    
+    if not avaliacoes_com_nota.exists():
+        return None
+    
+    from django.db.models import Avg
+    media = avaliacoes_com_nota.aggregate(media=Avg('nota_final'))['media']
+    return round(media, 2) if media else None
+
+
+# =============================================================================
+# Views de Geração de Relatórios de Estágios
+# US: Geração de relatórios dos estágios
+# CA1 - Filtros configuráveis
+# CA2 - Dados completos do estágio
+# CA3 - Validação de período
+# =============================================================================
+
+@login_required
+def gerar_relatorio_estagios(request):
+    """
+    View principal para geração de relatórios de estágios.
+    
+    BDD: DADO que existem dados de estágios
+         QUANDO o usuário solicitar um relatório
+         ENTÃO o sistema deve gerar o relatório conforme filtros aplicados
+    
+    CA1 - Filtros configuráveis
+    CA2 - Dados completos do estágio  
+    CA3 - Validação de período
+    """
+    from .forms import RelatorioEstagiosForm
+    from .models import Estagio, Documento, Avaliacao, HorasCumpridas, Aluno
+    
+    context = {
+        'titulo': 'Geração de Relatórios de Estágios',
+        'relatorio': None,
+        'filtros_aplicados': {},
+        'form': None,
+    }
+    
+    if request.method == 'POST':
+        form = RelatorioEstagiosForm(request.POST)
+        
+        if form.is_valid():
+            # CA3 - Período validado pelo form
+            relatorio = _gerar_relatorio_filtrado(request.user, form)
+            context['relatorio'] = relatorio
+            context['filtros_aplicados'] = form.get_filtros_ativos()
+        else:
+            context['erros'] = form.errors
+    else:
+        form = RelatorioEstagiosForm()
+    
+    context['form'] = form
+    return render(request, 'estagio/gerar_relatorio.html', context)
+
+
+@login_required
+def api_relatorio_estagios(request):
+    """
+    API para geração de relatórios de estágios em formato JSON.
+    
+    CA1 - Aceita filtros configuráveis via query params ou POST
+    CA2 - Retorna dados completos do estágio
+    CA3 - Valida período informado
+    """
+    from .forms import RelatorioEstagiosForm
+    
+    # Aceita tanto GET quanto POST
+    data = request.POST if request.method == 'POST' else request.GET
+    form = RelatorioEstagiosForm(data)
+    
+    if not form.is_valid():
+        return JsonResponse({
+            'success': False,
+            'errors': form.errors,
+            'message': 'Erro na validação dos filtros'
+        }, status=400)
+    
+    # CA1, CA2 - Gera relatório com filtros e dados completos
+    relatorio = _gerar_relatorio_filtrado(request.user, form)
+    
+    return JsonResponse({
+        'success': True,
+        'filtros_aplicados': form.get_filtros_ativos(),
+        'opcoes_inclusao': form.get_opcoes_inclusao(),
+        'relatorio': relatorio,
+        'total_estagios': len(relatorio.get('estagios', [])),
+    })
+
+
+@login_required  
+def api_relatorio_exportar(request):
+    """
+    API para exportação de relatórios em diferentes formatos.
+    
+    CA1 - Exporta conforme filtros aplicados
+    CA2 - Inclui todos os dados selecionados
+    """
+    from .forms import RelatorioEstagiosForm
+    import csv
+    from io import StringIO
+    from django.http import HttpResponse
+    
+    data = request.POST if request.method == 'POST' else request.GET
+    form = RelatorioEstagiosForm(data)
+    
+    if not form.is_valid():
+        return JsonResponse({
+            'success': False,
+            'errors': form.errors
+        }, status=400)
+    
+    relatorio = _gerar_relatorio_filtrado(request.user, form)
+    formato = form.cleaned_data.get('formato', 'json')
+    
+    if formato == 'csv':
+        return _exportar_csv(relatorio)
+    else:
+        return JsonResponse({
+            'success': True,
+            'relatorio': relatorio,
+            'filtros': form.get_filtros_ativos(),
+        })
+
+
+def _gerar_relatorio_filtrado(usuario, form):
+    """
+    Gera o relatório de estágios aplicando os filtros do formulário.
+    
+    CA1 - Aplica filtros configuráveis
+    CA2 - Inclui dados completos conforme seleção
+    CA3 - Filtra por período quando informado
+    
+    Args:
+        usuario: Usuário que está gerando o relatório
+        form: RelatorioEstagiosForm validado
+    
+    Returns:
+        dict: Relatório com estágios e dados relacionados
+    """
+    from .models import Estagio, Documento, Avaliacao, HorasCumpridas, Aluno
+    from admin.models import CursoCoordenador, Supervisor
+    
+    # Base queryset conforme perfil do usuário
+    estagios = _obter_estagios_por_perfil(usuario)
+    
+    # CA1, CA3 - Aplica filtros
+    estagios = _aplicar_filtros_relatorio(estagios, form.cleaned_data)
+    
+    # CA2 - Opções de inclusão de dados
+    opcoes = form.get_opcoes_inclusao()
+    
+    # Monta relatório com dados completos
+    relatorio = {
+        'estagios': [],
+        'resumo': {
+            'total': estagios.count(),
+            'por_status': {},
+            'por_empresa': {},
+        },
+        'periodo': form.get_filtros_ativos().get('periodo'),
+        'data_geracao': timezone.now().isoformat(),
+    }
+    
+    # Contabiliza por status
+    for status_code, status_nome in Estagio.STATUS_CHOICES:
+        count = estagios.filter(status=status_code).count()
+        if count > 0:
+            relatorio['resumo']['por_status'][status_nome] = count
+    
+    # CA2 - Monta dados completos de cada estágio
+    for estagio in estagios.select_related('empresa', 'supervisor'):
+        dados_estagio = _montar_dados_estagio(estagio, opcoes)
+        relatorio['estagios'].append(dados_estagio)
+        
+        # Contabiliza por empresa
+        empresa_nome = estagio.empresa.razao_social
+        if empresa_nome not in relatorio['resumo']['por_empresa']:
+            relatorio['resumo']['por_empresa'][empresa_nome] = 0
+        relatorio['resumo']['por_empresa'][empresa_nome] += 1
+    
+    return relatorio
+
+
+def _obter_estagios_por_perfil(usuario):
+    """
+    Retorna queryset de estágios conforme perfil do usuário.
+    
+    - Coordenador: Todos os estágios da instituição
+    - Supervisor: Estágios sob sua supervisão
+    - Aluno: Seus próprios estágios
+    """
+    from .models import Estagio, Aluno
+    from admin.models import CursoCoordenador, Supervisor
+    
+    if usuario.tipo == 'coordenador':
+        try:
+            coordenador = CursoCoordenador.objects.get(usuario=usuario)
+            alunos_instituicao = Aluno.objects.filter(
+                instituicao=coordenador.instituicao
+            ).values_list('id', flat=True)
+            return Estagio.objects.filter(
+                aluno_solicitante_id__in=alunos_instituicao
+            )
+        except CursoCoordenador.DoesNotExist:
+            return Estagio.objects.all()
+    
+    elif usuario.tipo == 'supervisor':
+        try:
+            supervisor = Supervisor.objects.get(usuario=usuario)
+            return Estagio.objects.filter(supervisor=supervisor)
+        except Supervisor.DoesNotExist:
+            return Estagio.objects.none()
+    
+    elif usuario.tipo == 'aluno':
+        try:
+            aluno = Aluno.objects.get(usuario=usuario)
+            return Estagio.objects.filter(aluno_solicitante=aluno)
+        except Aluno.DoesNotExist:
+            return Estagio.objects.none()
+    
+    return Estagio.objects.none()
+
+
+def _aplicar_filtros_relatorio(estagios, filtros):
+    """
+    Aplica os filtros ao queryset de estágios.
+    
+    CA1 - Filtros configuráveis
+    CA3 - Filtro de período
+    """
+    # CA3 - Filtro de período
+    data_inicio = filtros.get('data_inicio')
+    data_fim = filtros.get('data_fim')
+    
+    if data_inicio and data_fim:
+        estagios = estagios.filter(
+            data_inicio__gte=data_inicio,
+            data_inicio__lte=data_fim
+        )
+    
+    # CA1 - Filtro de status
+    status = filtros.get('status')
+    if status:
+        estagios = estagios.filter(status=status)
+    
+    # CA1 - Filtro de empresa
+    empresa = filtros.get('empresa')
+    if empresa:
+        estagios = estagios.filter(empresa=empresa)
+    
+    # CA1 - Filtro de supervisor
+    supervisor = filtros.get('supervisor')
+    if supervisor:
+        estagios = estagios.filter(supervisor=supervisor)
+    
+    # CA1 - Filtro de instituição (via aluno)
+    instituicao = filtros.get('instituicao')
+    if instituicao:
+        from .models import Aluno
+        alunos_instituicao = Aluno.objects.filter(
+            instituicao=instituicao
+        ).values_list('id', flat=True)
+        estagios = estagios.filter(aluno_solicitante_id__in=alunos_instituicao)
+    
+    return estagios
+
+
+def _montar_dados_estagio(estagio, opcoes):
+    """
+    Monta dados completos de um estágio para o relatório.
+    
+    CA2 - Inclusão de dados completos do estágio
+    """
+    from .models import Documento, Avaliacao, HorasCumpridas
+    
+    dados = {
+        'id': estagio.id,
+        'titulo': estagio.titulo,
+        'cargo': estagio.cargo,
+        'status': estagio.status,
+        'status_display': estagio.get_status_display(),
+        'data_inicio': estagio.data_inicio.isoformat() if estagio.data_inicio else None,
+        'data_fim': estagio.data_fim.isoformat() if estagio.data_fim else None,
+        'carga_horaria': estagio.carga_horaria,
+        'empresa': {
+            'razao_social': estagio.empresa.razao_social,
+            'cnpj': estagio.empresa.cnpj,
+        },
+        'supervisor': {
+            'nome': estagio.supervisor.nome,
+            'cargo': estagio.supervisor.cargo,
+        },
+    }
+    
+    # CA2 - Incluir dados do aluno
+    if opcoes.get('aluno') and estagio.aluno_solicitante:
+        dados['aluno'] = {
+            'nome': estagio.aluno_solicitante.nome,
+            'matricula': estagio.aluno_solicitante.matricula,
+            'contato': estagio.aluno_solicitante.contato,
+            'instituicao': estagio.aluno_solicitante.instituicao.nome if estagio.aluno_solicitante.instituicao else None,
+        }
+    
+    # CA2 - Incluir documentos
+    if opcoes.get('documentos'):
+        documentos = Documento.objects.filter(estagio=estagio)
+        dados['documentos'] = {
+            'total': documentos.count(),
+            'aprovados': documentos.filter(status='aprovado').count(),
+            'pendentes': documentos.filter(status__in=['enviado', 'corrigido']).count(),
+            'lista': [
+                {
+                    'id': doc.id,
+                    'nome': doc.nome_arquivo,
+                    'tipo': doc.tipo,
+                    'status': doc.status,
+                    'data_envio': doc.data_envio.isoformat() if doc.data_envio else None,
+                }
+                for doc in documentos[:10]  # Limita a 10 documentos
+            ]
+        }
+    
+    # CA2 - Incluir avaliações
+    if opcoes.get('avaliacoes'):
+        avaliacoes = Avaliacao.objects.filter(estagio=estagio)
+        dados['avaliacoes'] = {
+            'total': avaliacoes.count(),
+            'completas': avaliacoes.filter(status='parecer_emitido').count(),
+            'nota_media': _calcular_nota_media_avaliacoes(avaliacoes),
+            'lista': [
+                {
+                    'id': av.id,
+                    'periodo': av.get_periodo_display(),
+                    'status': av.status,
+                    'nota_final': av.nota_final,
+                    'data_avaliacao': av.data_avaliacao.isoformat() if av.data_avaliacao else None,
+                }
+                for av in avaliacoes[:10]  # Limita a 10 avaliações
+            ]
+        }
+    
+    # CA2 - Incluir horas cumpridas
+    if opcoes.get('horas') and estagio.aluno_solicitante:
+        horas = HorasCumpridas.objects.filter(aluno=estagio.aluno_solicitante)
+        total_horas = horas.aggregate(total=Sum('quantidade'))['total'] or 0
+        dados['horas'] = {
+            'total_registros': horas.count(),
+            'total_horas': total_horas,
+            'carga_horaria_estagio': estagio.carga_horaria,
+        }
+    
+    return dados
+
+
+def _exportar_csv(relatorio):
+    """
+    Exporta o relatório em formato CSV.
+    
+    CA1 - Exportação conforme filtros
+    """
+    from django.http import HttpResponse
+    import csv
+    
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="relatorio_estagios.csv"'
+    response.write('\ufeff')  # BOM para Excel reconhecer UTF-8
+    
+    writer = csv.writer(response)
+    
+    # Cabeçalho
+    writer.writerow([
+        'ID', 'Título', 'Cargo', 'Status', 'Data Início', 'Data Fim',
+        'Carga Horária', 'Empresa', 'Supervisor', 'Aluno', 'Matrícula',
+        'Total Documentos', 'Docs Aprovados', 'Total Avaliações', 'Nota Média'
+    ])
+    
+    # Dados
+    for estagio in relatorio.get('estagios', []):
+        aluno_nome = estagio.get('aluno', {}).get('nome', '-')
+        aluno_matricula = estagio.get('aluno', {}).get('matricula', '-')
+        docs = estagio.get('documentos', {})
+        avs = estagio.get('avaliacoes', {})
+        
+        writer.writerow([
+            estagio.get('id'),
+            estagio.get('titulo'),
+            estagio.get('cargo'),
+            estagio.get('status_display'),
+            estagio.get('data_inicio'),
+            estagio.get('data_fim'),
+            estagio.get('carga_horaria'),
+            estagio.get('empresa', {}).get('razao_social'),
+            estagio.get('supervisor', {}).get('nome'),
+            aluno_nome,
+            aluno_matricula,
+            docs.get('total', 0),
+            docs.get('aprovados', 0),
+            avs.get('total', 0),
+            avs.get('nota_media', '-'),
+        ])
+    
+    return response
+
+
+def validar_periodo_relatorio(data_inicio, data_fim):
+    """
+    CA3 - Função auxiliar para validação de período.
+    Pode ser usada em validações externas.
+    
+    Args:
+        data_inicio: Data de início do período
+        data_fim: Data de fim do período
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    from datetime import date, timedelta
+    
+    if not data_inicio and not data_fim:
+        return (True, None)
+    
+    if data_inicio and not data_fim:
+        return (False, 'Informe a data fim para completar o período.')
+    
+    if data_fim and not data_inicio:
+        return (False, 'Informe a data início para completar o período.')
+    
+    if data_fim < data_inicio:
+        return (False, 'A data fim não pode ser anterior à data início.')
+    
+    if (data_fim - data_inicio).days > 365:
+        return (False, 'O período máximo permitido é de 1 ano (365 dias).')
+    
+    if data_fim > date.today():
+        return (False, 'A data fim não pode ser uma data futura.')
+    
+    return (True, None)

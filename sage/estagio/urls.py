@@ -30,4 +30,25 @@ urlpatterns = [
     path('feedbacks/', views.listar_feedbacks, name='listar_feedbacks'),
     path('supervisor/enviar-feedback/', views.enviar_feedback_aluno, name='enviar_feedback_aluno'),
     path('supervisor/enviar-feedback/<int:aluno_id>/', views.enviar_feedback_aluno, name='enviar_feedback_aluno_especifico'),
+    
+    # Rotas de Consulta de Pareceres - CA6
+    path('pareceres/', views.listar_pareceres_aluno, name='listar_pareceres_aluno'),
+    path('pareceres/<int:avaliacao_id>/', views.consultar_parecer, name='consultar_parecer'),
+    
+    # Rotas do Painel de Status de Estágios - CA1, CA2, CA3
+    path('painel/', views.painel_estagios, name='painel_estagios'),
+    path('api/painel/', views.api_painel_estagios, name='api_painel_estagios'),
+    path('api/painel/estatisticas/', views.api_estatisticas_estagios, name='api_estatisticas_estagios'),
+    path('api/painel/status/<str:status>/', views.api_estagios_por_status, name='api_estagios_por_status'),
+    
+    # Rotas do Monitoramento de Pendências e Resultados - CA4, CA5, CA6
+    path('monitoramento/', views.monitoramento_pendencias, name='monitoramento_pendencias'),
+    path('api/monitoramento/', views.api_monitoramento_pendencias, name='api_monitoramento_pendencias'),
+    path('api/monitoramento/tipo/<str:tipo>/', views.api_pendencias_por_tipo, name='api_pendencias_por_tipo'),
+    path('api/monitoramento/resultados/', views.api_resultados_consolidados, name='api_resultados_consolidados'),
+    
+    # Rotas de Geração de Relatórios de Estágios - CA1, CA2, CA3
+    path('relatorios/', views.gerar_relatorio_estagios, name='gerar_relatorio_estagios'),
+    path('api/relatorios/', views.api_relatorio_estagios, name='api_relatorio_estagios'),
+    path('api/relatorios/exportar/', views.api_relatorio_exportar, name='api_relatorio_exportar'),
 ]

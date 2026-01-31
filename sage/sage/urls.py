@@ -30,14 +30,17 @@ urlpatterns = [
     path('cadastro/', cadastrar_aluno, name='cadastrar_aluno'),  # Cadastro público como aluno
     path('students/', TemplateView.as_view(template_name='dashboard.html'), name='students'),
     path('enterprises/', TemplateView.as_view(template_name='dashboard.html'), name='enterprises'),
-    path('users/', TemplateView.as_view(template_name='dashboard.html'), name='users'),
     path('documents/', TemplateView.as_view(template_name='dashboard.html'), name='documents'),
     path('administrative/', TemplateView.as_view(template_name='dashboard.html'), name='administrative'),
+    
+    # API REST
+    path('api/', include('admin.api_urls')),
     
     # Rotas por perfil
     path('estagio/', include('estagio.urls')),  # Aluno
     path('supervisor/', include('admin.urls_supervisor')),  # Supervisor
     path('coordenador/', include('admin.urls_coordenador')),  # Coordenador
+    path('usuarios/', include('users.urls')),  # Gestão de Usuários
 ]
 
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
