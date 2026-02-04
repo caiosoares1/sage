@@ -6,8 +6,10 @@
 
 {% block content %}
 <div class="page-header">
-    <h2><i class="fas fa-tasks"></i> Atividades dos Estagiários</h2>
-    <p>Confirme ou rejeite as atividades realizadas pelos seus estagiários</p>
+    <div>
+        <h2><i class="fas fa-tasks"></i> Atividades dos Estagiários</h2>
+        <p>Confirme ou rejeite as atividades realizadas pelos seus estagiários</p>
+    </div>
 </div>
 
 <!-- Estatísticas -->
@@ -72,7 +74,7 @@
 
 <!-- Lista de Atividades -->
 <div class="table-container">
-    <h3><i class="fas fa-list"></i> Atividades</h3>
+    <h3><i class="fas fa-clipboard-list"></i> Lista de Atividades</h3>
     
     {% if atividades %}
     <table class="data-table">
@@ -89,40 +91,43 @@
         <tbody>
             {% for atividade in atividades %}
             <tr>
-                <td>{{ atividade.data_realizacao|date:"d/m/Y" }}</td>
+                <td>
+                    <strong>{{ atividade.data_realizacao|date:"d/m/Y" }}</strong>
+                </td>
                 <td>{{ atividade.aluno.nome }}</td>
                 <td>
                     <div class="descricao-truncada" title="{{ atividade.descricao }}">
                         {{ atividade.descricao|truncatechars:50 }}
                     </div>
                 </td>
-                <td>{{ atividade.horas|floatformat:1 }}h</td>
+                <td><strong>{{ atividade.horas_dedicadas }}h</strong></td>
                 <td>
                     {% if atividade.status == 'pendente' %}
-                        <span class="status-badge status-warning">Pendente</span>
+                        <span class="status-badge status-warning"><i class="fas fa-clock"></i> Pendente</span>
                     {% elif atividade.status == 'confirmada' %}
-                        <span class="status-badge status-success">Confirmada</span>
+                        <span class="status-badge status-success"><i class="fas fa-check"></i> Confirmada</span>
                     {% elif atividade.status == 'rejeitada' %}
-                        <span class="status-badge status-danger">Rejeitada</span>
+                        <span class="status-badge status-danger"><i class="fas fa-times"></i> Rejeitada</span>
                     {% endif %}
                 </td>
                 <td class="actions">
                     <a href="{% url 'supervisor:visualizar_atividade' atividade.id %}" 
-                       class="btn btn-sm btn-info" title="Visualizar">
+                       class="btn-sm btn-info" title="Visualizar">
                         <i class="fas fa-eye"></i>
                     </a>
                     {% if atividade.status == 'pendente' %}
-                    <a href="{% url 'supervisor:confirmar_atividade' atividade.id %}" 
-                       class="btn btn-sm btn-success" title="Confirmar">
-                        <i class="fas fa-check"></i>
-                    </a>
-                    <a href="{% url 'supervisor:rejeitar_atividade' atividade.id %}" 
-                       class="btn btn-sm btn-danger" title="Rejeitar">
+                    <form method="post" action="{% url 'supervisor:confirmar_atividade' atividade.id %}" style="display: inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn-sm btn-success" title="Confirmar" onclick="return confirm('Confirmar esta atividade?');">
+                            <i class="fas fa-check"></i>
+                        </button>
+                    </form>
+                    <button type="button" class="btn-sm btn-danger" title="Rejeitar" onclick="abrirModalRejeicao({{ atividade.id }}, '{{ atividade.titulo|escapejs }}')">
                         <i class="fas fa-times"></i>
-                    </a>
+                    </button>
                     {% endif %}
                     <a href="{% url 'supervisor:historico_atividade' atividade.id %}" 
-                       class="btn btn-sm btn-secondary" title="Histórico">
+                       class="btn-sm btn-secondary" title="Histórico">
                         <i class="fas fa-history"></i>
                     </a>
                 </td>
@@ -145,5 +150,135 @@
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 12px;
+    width: 100%;
+    max-width: 500px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+    overflow: hidden;
+}
+
+.modal-header {
+    padding: 1.25rem 1.5rem;
+    background: linear-gradient(135deg, #F8FAFC 0%, white 100%);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h3 {
+    margin: 0;
+    font-size: 1.125rem;
+    color: var(--text-dark);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.modal-header h3 i {
+    color: #EF4444;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--text-gray);
+    transition: color 0.2s;
+}
+
+.close-btn:hover {
+    color: #EF4444;
+}
+
+.modal-body {
+    padding: 1.5rem;
+}
+
+.modal-body p {
+    margin-bottom: 1rem;
+}
+
+.modal-footer {
+    padding: 1rem 1.5rem;
+    background: #F8FAFC;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+}
+
+.help-text {
+    display: block;
+    margin-top: 0.5rem;
+    font-size: 0.8rem;
+    color: var(--text-gray);
+}
 </style>
+
+<!-- Modal de Rejeição -->
+<div id="modal-rejeicao" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="fas fa-times-circle"></i> Rejeitar Atividade</h3>
+            <button type="button" onclick="fecharModal()" class="close-btn">&times;</button>
+        </div>
+        <form id="form-rejeicao" method="post" action="">
+            {% csrf_token %}
+            <div class="modal-body">
+                <p>Atividade: <strong id="atividade-titulo"></strong></p>
+                <div class="form-group">
+                    <label for="justificativa" class="required">Justificativa</label>
+                    <textarea name="justificativa" id="justificativa" class="form-control" 
+                              rows="4" required minlength="10"
+                              placeholder="Informe o motivo da rejeição (mínimo 10 caracteres)..."></textarea>
+                    <small class="help-text">A justificativa é obrigatória e será registrada no histórico.</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="fecharModal()" class="btn btn-secondary">Cancelar</button>
+                <button type="submit" class="btn btn-danger">
+                    <i class="fas fa-times"></i> Confirmar Rejeição
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function abrirModalRejeicao(atividadeId, titulo) {
+    document.getElementById('modal-rejeicao').style.display = 'flex';
+    document.getElementById('atividade-titulo').textContent = titulo;
+    document.getElementById('form-rejeicao').action = '/supervisor/atividades/' + atividadeId + '/rejeitar/';
+}
+
+function fecharModal() {
+    document.getElementById('modal-rejeicao').style.display = 'none';
+    document.getElementById('justificativa').value = '';
+}
+
+// Fechar modal ao clicar fora
+document.getElementById('modal-rejeicao').addEventListener('click', function(e) {
+    if (e.target === this) {
+        fecharModal();
+    }
+});
+</script>
 {% endblock %}

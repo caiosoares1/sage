@@ -6,9 +6,9 @@
 <div class="page-header">
     <div>
         <h2><i class="fas fa-clipboard-check"></i> Detalhes da Atividade</h2>
-        <p class="subtitle">Visualize e gerencie os detalhes desta atividade</p>
+        <p class="subtitle">Visualize os detalhes da atividade registrada</p>
     </div>
-    <a href="{% url 'listar_atividades_pendentes' %}" class="btn btn-secondary">
+    <a href="{% url 'supervisor:atividades_pendentes' %}" class="btn btn-secondary">
         <i class="fas fa-arrow-left"></i> Voltar
     </a>
 </div>
@@ -78,7 +78,7 @@
             
             {% if atividade.status == 'pendente' %}
             <div class="card-footer">
-                <form method="post" action="{% url 'confirmar_atividade' atividade.id %}" style="display: inline;">
+                <form method="post" action="{% url 'supervisor:confirmar_atividade' atividade.id %}" style="display: inline;">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-success" onclick="return confirm('Confirmar esta atividade?');">
                         <i class="fas fa-check"></i> Confirmar Atividade
@@ -90,7 +90,7 @@
                 </button>
                 
                 <div id="form-rejeicao" style="display: none;">
-                    <form method="post" action="{% url 'rejeitar_atividade' atividade.id %}">
+                    <form method="post" action="{% url 'supervisor:rejeitar_atividade' atividade.id %}">
                         {% csrf_token %}
                         <div class="form-group">
                             <label for="justificativa" class="required">Justificativa da Rejeição</label>
@@ -147,98 +147,25 @@
             </div>
         </div>
 
+        {% if atividade.confirmado_por %}
         <div class="card">
             <div class="card-header">
-                <h3><i class="fas fa-history"></i> Histórico</h3>
+                <h3><i class="fas fa-user-check"></i> Processado Por</h3>
             </div>
             <div class="card-body">
-                {% if historico %}
-                <ul class="timeline">
-                    {% for item in historico %}
-                    <li class="timeline-item">
-                        <span class="timeline-badge badge-{{ item.acao }}">
-                            {% if item.acao == 'confirmada' %}
-                            <i class="fas fa-check"></i>
-                            {% elif item.acao == 'rejeitada' %}
-                            <i class="fas fa-times"></i>
-                            {% else %}
-                            <i class="fas fa-plus"></i>
-                            {% endif %}
-                        </span>
-                        <div class="timeline-content">
-                            <strong>{{ item.get_acao_display }}</strong>
-                            <br><small>{{ item.data_hora|date:"d/m/Y H:i" }}</small>
-                            {% if item.supervisor %}
-                            <br><small>Por: {{ item.supervisor.nome }}</small>
-                            {% endif %}
-                        </div>
-                    </li>
-                    {% endfor %}
-                </ul>
-                {% else %}
-                <div class="empty-state" style="padding: 1rem;">
-                    <i class="fas fa-info-circle" style="font-size: 2rem;"></i>
-                    <p>Nenhum histórico disponível.</p>
+                <div class="info-group">
+                    <label>Supervisor</label>
+                    <p><strong>{{ atividade.confirmado_por.nome }}</strong></p>
+                </div>
+                {% if atividade.data_confirmacao %}
+                <div class="info-group">
+                    <label>Data</label>
+                    <p>{{ atividade.data_confirmacao|date:"d/m/Y H:i" }}</p>
                 </div>
                 {% endif %}
             </div>
         </div>
+        {% endif %}
     </div>
 </div>
-
-<style>
-.info-group p i {
-    color: var(--primary-color);
-    margin-right: 0.5rem;
-}
-
-.timeline {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-}
-
-.timeline-item {
-    display: flex;
-    gap: 0.75rem;
-    padding: 0.75rem 0;
-    border-bottom: 1px solid var(--border-color);
-}
-
-.timeline-item:last-child {
-    border-bottom: none;
-}
-
-.timeline-badge {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    flex-shrink: 0;
-    font-size: 0.85rem;
-}
-
-.badge-confirmada {
-    background: #10B981;
-}
-
-.badge-rejeitada {
-    background: #EF4444;
-}
-
-.badge-registrada {
-    background: #3B82F6;
-}
-
-.timeline-content {
-    font-size: 0.9rem;
-}
-
-.timeline-content small {
-    color: var(--text-gray);
-}
-</style>
 {% endblock %}

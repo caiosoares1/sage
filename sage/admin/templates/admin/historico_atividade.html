@@ -1,0 +1,219 @@
+{% extends 'base.html' %}
+
+{% block title %}Histórico - {{ atividade.titulo }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2><i class="fas fa-history"></i> Histórico da Atividade</h2>
+        <p class="subtitle">Registro de ações realizadas nesta atividade</p>
+    </div>
+    <a href="{% url 'supervisor:atividades_pendentes' %}" class="btn btn-secondary">
+        <i class="fas fa-arrow-left"></i> Voltar
+    </a>
+</div>
+
+<div class="row">
+    <div class="col-8">
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="fas fa-list-alt"></i> Linha do Tempo</h3>
+            </div>
+            <div class="card-body">
+                {% if historico %}
+                <div class="timeline-container">
+                    {% for item in historico %}
+                    <div class="timeline-item-full">
+                        <div class="timeline-marker 
+                            {% if item.acao == 'confirmada' %}marker-success
+                            {% elif item.acao == 'rejeitada' %}marker-danger
+                            {% else %}marker-info{% endif %}">
+                            {% if item.acao == 'confirmada' %}
+                            <i class="fas fa-check"></i>
+                            {% elif item.acao == 'rejeitada' %}
+                            <i class="fas fa-times"></i>
+                            {% else %}
+                            <i class="fas fa-plus"></i>
+                            {% endif %}
+                        </div>
+                        <div class="timeline-content-full">
+                            <div class="timeline-header">
+                                <strong>{{ item.get_acao_display }}</strong>
+                                <span class="timeline-date">{{ item.data_hora|date:"d/m/Y H:i" }}</span>
+                            </div>
+                            {% if item.supervisor %}
+                            <p class="timeline-user"><i class="fas fa-user"></i> {{ item.supervisor.nome }}</p>
+                            {% endif %}
+                            {% if item.observacoes %}
+                            <div class="timeline-obs">
+                                <label>Observações:</label>
+                                <p>{{ item.observacoes }}</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <i class="fas fa-info-circle"></i>
+                    <p>Nenhum histórico registrado para esta atividade.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-4">
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="fas fa-clipboard-check"></i> Atividade</h3>
+            </div>
+            <div class="card-body">
+                <div class="info-group">
+                    <label>Título</label>
+                    <p><strong>{{ atividade.titulo }}</strong></p>
+                </div>
+                <div class="info-group">
+                    <label>Status Atual</label>
+                    <p>
+                        {% if atividade.status == 'pendente' %}
+                            <span class="status-badge status-warning"><i class="fas fa-clock"></i> Pendente</span>
+                        {% elif atividade.status == 'confirmada' %}
+                            <span class="status-badge status-success"><i class="fas fa-check"></i> Confirmada</span>
+                        {% elif atividade.status == 'rejeitada' %}
+                            <span class="status-badge status-danger"><i class="fas fa-times"></i> Rejeitada</span>
+                        {% endif %}
+                    </p>
+                </div>
+                <div class="info-group">
+                    <label>Data de Realização</label>
+                    <p>{{ atividade.data_realizacao|date:"d/m/Y" }}</p>
+                </div>
+                <div class="info-group">
+                    <label>Horas Dedicadas</label>
+                    <p>{{ atividade.horas_dedicadas }}h</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="fas fa-user-graduate"></i> Aluno</h3>
+            </div>
+            <div class="card-body">
+                <div class="info-group">
+                    <label>Nome</label>
+                    <p><strong>{{ atividade.aluno.nome }}</strong></p>
+                </div>
+                <div class="info-group">
+                    <label>Matrícula</label>
+                    <p>{{ atividade.aluno.matricula }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.timeline-container {
+    position: relative;
+    padding-left: 2rem;
+}
+
+.timeline-container::before {
+    content: '';
+    position: absolute;
+    left: 0.75rem;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--border-color);
+}
+
+.timeline-item-full {
+    position: relative;
+    padding-bottom: 1.5rem;
+}
+
+.timeline-item-full:last-child {
+    padding-bottom: 0;
+}
+
+.timeline-marker {
+    position: absolute;
+    left: -1.75rem;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 0.85rem;
+}
+
+.marker-success {
+    background: #10B981;
+}
+
+.marker-danger {
+    background: #EF4444;
+}
+
+.marker-info {
+    background: #3B82F6;
+}
+
+.timeline-content-full {
+    background: var(--white);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-left: 0.5rem;
+}
+
+.timeline-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.timeline-date {
+    font-size: 0.8rem;
+    color: var(--text-gray);
+}
+
+.timeline-user {
+    font-size: 0.9rem;
+    color: var(--text-gray);
+    margin: 0.5rem 0;
+}
+
+.timeline-user i {
+    margin-right: 0.5rem;
+}
+
+.timeline-obs {
+    background: #F8FAFC;
+    padding: 0.75rem;
+    border-radius: 6px;
+    margin-top: 0.75rem;
+}
+
+.timeline-obs label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--text-gray);
+    display: block;
+    margin-bottom: 0.25rem;
+}
+
+.timeline-obs p {
+    margin: 0;
+    font-size: 0.9rem;
+}
+</style>
+{% endblock %}

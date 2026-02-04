@@ -71,7 +71,7 @@
                                 <option value="">Todas as empresas</option>
                                 {% for empresa in empresas %}
                                 <option value="{{ empresa.id }}" {% if filtro_empresa == empresa.id|stringformat:"s" %}selected{% endif %}>
-                                    {{ empresa.nome }}
+                                    {{ empresa.razao_social }}
                                 </option>
                                 {% endfor %}
                             </select>

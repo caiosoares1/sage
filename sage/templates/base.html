@@ -216,10 +216,12 @@
     <script>
         // Função para atualizar contador de notificações
         function atualizarBadgeNotificacoes() {
+            const badge = document.getElementById('notification-badge');
+            if (!badge) return; // Sair se o elemento não existir na página
+            
             fetch('{% url "api_contar_notificacoes_nao_lidas" %}')
                 .then(response => response.json())
                 .then(data => {
-                    const badge = document.getElementById('notification-badge');
                     if (data.count > 0) {
                         badge.textContent = data.count > 9 ? '9+' : data.count;
                         badge.style.display = 'flex';

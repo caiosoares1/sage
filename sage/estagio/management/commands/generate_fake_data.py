@@ -9,6 +9,7 @@ Uso:
 """
 from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from admin.models import Instituicao, Empresa, Supervisor, CursoCoordenador
 from estagio.models import Aluno, Estagio
 from datetime import date, timedelta
@@ -68,6 +69,12 @@ class Command(BaseCommand):
             default=40,
             help='Número de estágios a criar (padrão: 40)',
         )
+        parser.add_argument(
+            '--atividades',
+            type=int,
+            default=60,
+            help='Número de atividades a criar (padrão: 60)',
+        )
 
     def handle(self, *args, **options):
         if not FAKER_AVAILABLE:
@@ -84,6 +91,8 @@ class Command(BaseCommand):
 
         if options['clear']:
             self.stdout.write(self.style.WARNING('⚠️  Limpando dados existentes...'))
+            from estagio.models import Atividade
+            Atividade.objects.all().delete()
             Aluno.objects.all().delete()
             Estagio.objects.all().delete()
             CursoCoordenador.objects.all().delete()
@@ -110,6 +119,9 @@ class Command(BaseCommand):
         
         # Gerar Alunos (requer instituições)
         alunos = self._criar_alunos(fake, instituicoes, estagios, options['alunos'])
+        
+        # Gerar Atividades (requer alunos com estágio)
+        atividades = self._criar_atividades(fake, alunos, options['atividades'])
 
         self.stdout.write('')
         self.stdout.write(self.style.SUCCESS('=' * 50))
@@ -121,6 +133,7 @@ class Command(BaseCommand):
         self.stdout.write(f'   🎓 Coordenadores: {len(coordenadores)}')
         self.stdout.write(f'   📋 Estágios: {len(estagios)}')
         self.stdout.write(f'   👨‍🎓 Alunos: {len(alunos)}')
+        self.stdout.write(f'   📝 Atividades: {len(atividades)}')
         self.stdout.write(self.style.SUCCESS('=' * 50))
         self.stdout.write('')
         self.stdout.write(self.style.SUCCESS('✅ Dados gerados com sucesso!'))
@@ -139,11 +152,11 @@ class Command(BaseCommand):
             cidade = fake.city()
             
             instituicao = Instituicao.objects.create(
-                nome=f'{tipo} {cidade}',
-                contato=fake.phone_number(),
-                rua=fake.street_name(),
-                numero=fake.building_number(),
-                bairro=fake.bairro()
+                nome=f'{tipo} {cidade}'[:150],
+                contato=fake.phone_number()[:90],
+                rua=fake.street_name()[:50],
+                numero=int(fake.building_number()) % 10000,
+                bairro=fake.bairro()[:30]
             )
             instituicoes.append(instituicao)
         
@@ -163,10 +176,10 @@ class Command(BaseCommand):
             
             empresa = Empresa.objects.create(
                 cnpj=fake.cnpj().replace('.', '').replace('/', '').replace('-', ''),
-                razao_social=f'{fake.company()} {setor} {random.choice(tipos)}',
-                rua=fake.street_name(),
-                numero=int(fake.building_number()),
-                bairro=fake.bairro()
+                razao_social=f'{fake.company()} {setor} {random.choice(tipos)}'[:150],
+                rua=fake.street_name()[:50],
+                numero=int(fake.building_number()) % 10000,
+                bairro=fake.bairro()[:30]
             )
             empresas.append(empresa)
         
@@ -337,4 +350,86 @@ class Command(BaseCommand):
             alunos.append(aluno)
         
         self.stdout.write(self.style.SUCCESS(f'   ✅ {len(alunos)} alunos criados'))
+        
+        # Vincular alunos como solicitantes em estágios com status 'analise'
+        estagios_analise = Estagio.objects.filter(status='analise', aluno_solicitante__isnull=True)
+        alunos_sem_solicitacao = list(alunos)  # Cópia para não modificar a lista original
+        
+        for estagio in estagios_analise:
+            if alunos_sem_solicitacao:
+                aluno = random.choice(alunos_sem_solicitacao)
+                estagio.aluno_solicitante = aluno
+                estagio.data_solicitacao = timezone.now() - timedelta(days=random.randint(1, 30))
+                estagio.save()
+                alunos_sem_solicitacao.remove(aluno)  # Cada aluno só pode solicitar um
+        
+        self.stdout.write(self.style.SUCCESS(f'   ✅ Vinculados {estagios_analise.count()} solicitantes a estágios em análise'))
+        
         return alunos
+
+    def _criar_atividades(self, fake, alunos, quantidade):
+        """Cria atividades para os alunos com estágio vinculado"""
+        self.stdout.write(f'📝 Criando {quantidade} atividades...')
+        
+        from estagio.models import Atividade
+        from datetime import date
+        
+        titulos_atividades = [
+            'Desenvolvimento de API REST',
+            'Implementação de testes unitários',
+            'Criação de documentação técnica',
+            'Análise de requisitos',
+            'Reunião de alinhamento',
+            'Correção de bugs',
+            'Code review',
+            'Deploy em produção',
+            'Configuração de ambiente',
+            'Estudo de novas tecnologias',
+            'Desenvolvimento de frontend',
+            'Integração com sistemas externos',
+            'Otimização de performance',
+            'Criação de relatórios',
+            'Treinamento interno',
+        ]
+        
+        descricoes = [
+            'Realizei as atividades conforme solicitado pelo supervisor.',
+            'Trabalhei no desenvolvimento das funcionalidades planejadas.',
+            'Participei ativamente das reuniões e contribuí com sugestões.',
+            'Finalizei as tarefas dentro do prazo estabelecido.',
+            'Colaborei com a equipe na resolução de problemas técnicos.',
+        ]
+        
+        status_choices = ['pendente', 'confirmada', 'rejeitada']
+        status_weights = [0.6, 0.3, 0.1]  # 60% pendente, 30% confirmada, 10% rejeitada
+        
+        # Filtrar apenas alunos com estágio vinculado
+        alunos_com_estagio = [a for a in alunos if a.estagio is not None]
+        
+        if not alunos_com_estagio:
+            self.stdout.write(self.style.WARNING('   ⚠️ Nenhum aluno com estágio vinculado para criar atividades'))
+            return []
+        
+        atividades = []
+        for i in range(quantidade):
+            aluno = random.choice(alunos_com_estagio)
+            status = random.choices(status_choices, weights=status_weights)[0]
+            
+            data_realizacao = fake.date_between(start_date='-30d', end_date='today')
+            
+            atividade = Atividade.objects.create(
+                aluno=aluno,
+                estagio=aluno.estagio,
+                titulo=random.choice(titulos_atividades),
+                descricao=random.choice(descricoes) + ' ' + fake.paragraph(nb_sentences=2),
+                data_realizacao=data_realizacao,
+                horas_dedicadas=random.randint(1, 8),
+                status=status,
+                confirmado_por=aluno.estagio.supervisor if status != 'pendente' else None,
+                data_confirmacao=timezone.now() - timedelta(days=random.randint(0, 10)) if status != 'pendente' else None,
+                justificativa_rejeicao='Atividade não corresponde ao plano de estágio.' if status == 'rejeitada' else None
+            )
+            atividades.append(atividade)
+        
+        self.stdout.write(self.style.SUCCESS(f'   ✅ {len(atividades)} atividades criadas'))
+        return atividades

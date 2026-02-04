@@ -67,7 +67,9 @@ def solicitar_estagio(request):
             documento.coordenador = coordenador
             documento.versao = 1.0
             documento.tipo = 'termo_compromisso'
-            documento.nome_arquivo = documento.arquivo.name if documento.arquivo else 'documento.pdf'
+            # Truncar nome do arquivo para caber no campo (max 50 chars)
+            nome_arquivo = documento.arquivo.name if documento.arquivo else 'documento.pdf'
+            documento.nome_arquivo = nome_arquivo[:50]
             documento.enviado_por = usuario
             documento.save()
             
@@ -731,6 +733,8 @@ def aluno_reenviar_documento(request, documento_id):
             return redirect("estagio_detalhe", estagio_id=old.estagio.id)
 
         nome_arquivo = request.POST.get('nome_arquivo', uploaded_file.name or old.nome_arquivo)
+        # Truncar nome do arquivo para caber no campo (max 50 chars)
+        nome_arquivo = nome_arquivo[:50] if nome_arquivo else 'documento.pdf'
         tipo = request.POST.get('tipo', old.tipo)
 
         # calcular nova versão
@@ -839,7 +843,7 @@ def reenviar_documento(request, documento_id):
                     estagio=documento_original.estagio,
                     tipo=documento_original.tipo,
                     arquivo=arquivo,
-                    nome_arquivo=arquivo.name,
+                    nome_arquivo=arquivo.name[:50],  # Truncar para max 50 chars
                     data_envio=now().date(),
                     status='corrigido',  # Status 'corrigido' para reanálise
                     versao=documento_original.versao + 1,
@@ -2283,28 +2287,176 @@ def gerar_relatorio_estagios(request):
     """
     from .forms import RelatorioEstagiosForm
     from .models import Estagio, Documento, Avaliacao, HorasCumpridas, Aluno
+    from admin.models import Empresa
+    
+    # Pegar filtros da requisição
+    filtro_tipo = request.GET.get('tipo', '')
+    filtro_periodo_inicio = request.GET.get('periodo_inicio', '')
+    filtro_periodo_fim = request.GET.get('periodo_fim', '')
+    filtro_empresa = request.GET.get('empresa', '')
+    filtro_curso = request.GET.get('curso', '')
+    filtro_status = request.GET.get('status', '')
+    
+    # Buscar empresas para o filtro
+    empresas = Empresa.objects.all().order_by('razao_social')
+    
+    # Buscar dados conforme filtros
+    dados = []
+    colunas = []
+    resumo = []
+    
+    if filtro_tipo:
+        # Para relatórios, buscar todos os estágios (admin/coordenador vê tudo)
+        from .models import Estagio as EstagioModel
+        estagios = EstagioModel.objects.all().select_related('empresa', 'supervisor', 'aluno_solicitante')
+        
+        # DEBUG: imprimir quantos estágios existem
+        print(f"DEBUG: Total estágios antes de filtros: {estagios.count()}")
+        
+        # Aplicar filtros
+        if filtro_status:
+            status_map = {
+                'ativo': 'em_andamento',
+                'pendente': 'analise',
+                'concluido': 'aprovado',
+                'cancelado': 'reprovado'
+            }
+            estagios = estagios.filter(status=status_map.get(filtro_status, filtro_status))
+        
+        if filtro_empresa:
+            estagios = estagios.filter(empresa_id=filtro_empresa)
+        
+        # Só aplica filtro de período se AMBAS as datas estiverem preenchidas com valores válidos
+        # E apenas se o formato for uma data válida (YYYY-MM-DD)
+        import re
+        date_pattern = r'^\d{4}-\d{2}-\d{2}$'
+        if (filtro_periodo_inicio and filtro_periodo_fim 
+            and re.match(date_pattern, filtro_periodo_inicio) 
+            and re.match(date_pattern, filtro_periodo_fim)):
+            try:
+                estagios = estagios.filter(
+                    data_inicio__gte=filtro_periodo_inicio,
+                    data_inicio__lte=filtro_periodo_fim
+                )
+                print(f"DEBUG: Após filtro período ({filtro_periodo_inicio} a {filtro_periodo_fim}): {estagios.count()}")
+            except Exception as e:
+                print(f"DEBUG: Erro ao filtrar período: {e}")
+        
+        print(f"DEBUG: Total estágios para relatório: {estagios.count()}")
+        
+        # Montar dados conforme tipo de relatório
+        if filtro_tipo == 'estagios_ativos':
+            colunas = ['ID', 'Título', 'Empresa', 'Status', 'Data Início', 'Data Fim']
+            # Mostrar estágios em andamento OU todos se não tiver nenhum em andamento
+            estagios_filtrados = estagios.filter(status='em_andamento')
+            if not estagios_filtrados.exists():
+                estagios_filtrados = estagios  # Mostrar todos
+            for e in estagios_filtrados:
+                dados.append([
+                    e.id,
+                    e.titulo,
+                    e.empresa.razao_social if e.empresa else 'N/A',
+                    e.get_status_display(),
+                    e.data_inicio.strftime('%d/%m/%Y') if e.data_inicio else 'N/A',
+                    e.data_fim.strftime('%d/%m/%Y') if e.data_fim else 'N/A',
+                ])
+            resumo.append({'label': 'Total de Estágios', 'valor': len(dados)})
+            
+        elif filtro_tipo == 'estagios_concluidos':
+            colunas = ['ID', 'Título', 'Empresa', 'Aluno', 'Data Conclusão']
+            for e in estagios.filter(status='aprovado'):
+                dados.append([
+                    e.id,
+                    e.titulo,
+                    e.empresa.razao_social if e.empresa else 'N/A',
+                    e.aluno_solicitante.nome if e.aluno_solicitante else 'N/A',
+                    e.data_fim.strftime('%d/%m/%Y') if e.data_fim else 'N/A',
+                ])
+            resumo.append({'label': 'Total de Estágios Concluídos', 'valor': len(dados)})
+            
+        elif filtro_tipo == 'horas_estagiarios':
+            colunas = ['Aluno', 'Estágio', 'Carga Horária Semanal', 'Total Horas Registradas']
+            for e in estagios.select_related('aluno_solicitante'):
+                if e.aluno_solicitante:
+                    horas_registradas = HorasCumpridas.objects.filter(aluno=e.aluno_solicitante).aggregate(
+                        total=models.Sum('horas_cumpridas')
+                    )['total'] or 0
+                    dados.append([
+                        e.aluno_solicitante.nome,
+                        e.titulo,
+                        f'{e.carga_horaria}h/semana',
+                        f'{horas_registradas}h',
+                    ])
+            resumo.append({'label': 'Total de Estagiários', 'valor': len(dados)})
+            
+        elif filtro_tipo == 'desempenho_alunos':
+            colunas = ['Aluno', 'Estágio', 'Avaliações', 'Média']
+            for e in estagios.select_related('aluno_solicitante'):
+                if e.aluno_solicitante:
+                    avaliacoes = Avaliacao.objects.filter(aluno=e.aluno_solicitante, status='aprovada')
+                    qtd = avaliacoes.count()
+                    dados.append([
+                        e.aluno_solicitante.nome,
+                        e.titulo,
+                        qtd,
+                        'Bom' if qtd > 0 else 'Sem avaliações',
+                    ])
+            resumo.append({'label': 'Total de Alunos', 'valor': len(dados)})
+            
+        elif filtro_tipo == 'empresas_parceiras':
+            colunas = ['Empresa', 'CNPJ', 'Qtd. Estágios', 'Qtd. Ativos']
+            empresas_relatorio = {}
+            for e in estagios:
+                if e.empresa:
+                    key = e.empresa.id
+                    if key not in empresas_relatorio:
+                        empresas_relatorio[key] = {
+                            'empresa': e.empresa,
+                            'total': 0,
+                            'ativos': 0
+                        }
+                    empresas_relatorio[key]['total'] += 1
+                    if e.status == 'em_andamento':
+                        empresas_relatorio[key]['ativos'] += 1
+            for k, v in empresas_relatorio.items():
+                dados.append([
+                    v['empresa'].razao_social,
+                    v['empresa'].cnpj,
+                    v['total'],
+                    v['ativos'],
+                ])
+            resumo.append({'label': 'Total de Empresas', 'valor': len(dados)})
+            
+        elif filtro_tipo == 'documentos_pendentes':
+            colunas = ['Documento', 'Estágio', 'Aluno', 'Status', 'Prazo']
+            documentos = Documento.objects.filter(
+                status__in=['pendente', 'enviado', 'ajustes_solicitados']
+            ).select_related('estagio', 'estagio__aluno_solicitante')
+            for d in documentos:
+                dados.append([
+                    d.nome_arquivo,
+                    d.estagio.titulo if d.estagio else 'N/A',
+                    d.estagio.aluno_solicitante.nome if d.estagio and d.estagio.aluno_solicitante else 'N/A',
+                    d.get_status_display(),
+                    d.prazo_limite.strftime('%d/%m/%Y') if d.prazo_limite else 'N/A',
+                ])
+            resumo.append({'label': 'Total de Documentos Pendentes', 'valor': len(dados)})
     
     context = {
         'titulo': 'Geração de Relatórios de Estágios',
-        'relatorio': None,
-        'filtros_aplicados': {},
-        'form': None,
+        'dados': dados,
+        'colunas': colunas,
+        'resumo': resumo,
+        'empresas': empresas,
+        'cursos': [],  # Pode ser populado se necessário
+        'filtro_tipo': filtro_tipo,
+        'filtro_periodo_inicio': filtro_periodo_inicio,
+        'filtro_periodo_fim': filtro_periodo_fim,
+        'filtro_empresa': filtro_empresa,
+        'filtro_curso': filtro_curso,
+        'filtro_status': filtro_status,
     }
     
-    if request.method == 'POST':
-        form = RelatorioEstagiosForm(request.POST)
-        
-        if form.is_valid():
-            # CA3 - Período validado pelo form
-            relatorio = _gerar_relatorio_filtrado(request.user, form)
-            context['relatorio'] = relatorio
-            context['filtros_aplicados'] = form.get_filtros_ativos()
-        else:
-            context['erros'] = form.errors
-    else:
-        form = RelatorioEstagiosForm()
-    
-    context['form'] = form
     return render(request, 'estagio/gerar_relatorio.html', context)
 
 
@@ -2352,7 +2504,7 @@ def api_relatorio_exportar(request):
     """
     from .forms import RelatorioEstagiosForm
     import csv
-    from io import StringIO
+    from io import StringIO, BytesIO
     from django.http import HttpResponse
     
     data = request.POST if request.method == 'POST' else request.GET
@@ -2369,12 +2521,150 @@ def api_relatorio_exportar(request):
     
     if formato == 'csv':
         return _exportar_csv(relatorio)
+    elif formato == 'excel':
+        return _exportar_excel(relatorio)
+    elif formato == 'pdf':
+        return _exportar_pdf(relatorio)
     else:
         return JsonResponse({
             'success': True,
             'relatorio': relatorio,
             'filtros': form.get_filtros_ativos(),
         })
+
+
+def _exportar_excel(relatorio):
+    """Exporta relatório para formato Excel (CSV com extensão xlsx simulada)"""
+    from django.http import HttpResponse
+    import csv
+    from io import StringIO
+    
+    output = StringIO()
+    writer = csv.writer(output, delimiter=';')
+    
+    # Cabeçalho
+    writer.writerow(['Relatório de Estágios'])
+    writer.writerow(['Data de Geração', relatorio.get('data_geracao', '')])
+    writer.writerow([])
+    
+    # Resumo
+    writer.writerow(['RESUMO'])
+    resumo = relatorio.get('resumo', {})
+    writer.writerow(['Total de Estágios', resumo.get('total', 0)])
+    writer.writerow([])
+    
+    # Por Status
+    writer.writerow(['Por Status'])
+    for status, count in resumo.get('por_status', {}).items():
+        writer.writerow([status, count])
+    writer.writerow([])
+    
+    # Estágios
+    writer.writerow(['ESTÁGIOS'])
+    writer.writerow(['ID', 'Título', 'Cargo', 'Status', 'Empresa', 'Supervisor', 'Data Início', 'Data Fim'])
+    
+    for estagio in relatorio.get('estagios', []):
+        writer.writerow([
+            estagio.get('id', ''),
+            estagio.get('titulo', ''),
+            estagio.get('cargo', ''),
+            estagio.get('status_display', ''),
+            estagio.get('empresa', {}).get('razao_social', ''),
+            estagio.get('supervisor', {}).get('nome', ''),
+            estagio.get('data_inicio', ''),
+            estagio.get('data_fim', ''),
+        ])
+    
+    response = HttpResponse(output.getvalue(), content_type='application/vnd.ms-excel')
+    response['Content-Disposition'] = 'attachment; filename="relatorio_estagios.xls"'
+    return response
+
+
+def _exportar_pdf(relatorio):
+    """Exporta relatório para formato PDF (HTML para impressão)"""
+    from django.http import HttpResponse
+    
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <title>Relatório de Estágios</title>
+        <style>
+            body {{ font-family: Arial, sans-serif; margin: 20px; }}
+            h1 {{ color: #333; border-bottom: 2px solid #6366f1; padding-bottom: 10px; }}
+            h2 {{ color: #666; margin-top: 30px; }}
+            table {{ border-collapse: collapse; width: 100%; margin-top: 15px; }}
+            th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
+            th {{ background-color: #6366f1; color: white; }}
+            tr:nth-child(even) {{ background-color: #f9f9f9; }}
+            .resumo {{ background: #f0f0f0; padding: 15px; border-radius: 8px; margin: 20px 0; }}
+            .resumo-item {{ display: inline-block; margin-right: 30px; }}
+            .resumo-label {{ font-weight: bold; color: #666; }}
+            .resumo-valor {{ font-size: 1.2em; color: #333; }}
+            @media print {{ body {{ margin: 0; }} }}
+        </style>
+    </head>
+    <body>
+        <h1>📊 Relatório de Estágios</h1>
+        <p><strong>Data de Geração:</strong> {relatorio.get('data_geracao', '')}</p>
+        
+        <div class="resumo">
+            <h2>Resumo</h2>
+            <div class="resumo-item">
+                <span class="resumo-label">Total de Estágios:</span>
+                <span class="resumo-valor">{relatorio.get('resumo', {}).get('total', 0)}</span>
+            </div>
+        </div>
+        
+        <h2>Por Status</h2>
+        <table>
+            <tr><th>Status</th><th>Quantidade</th></tr>
+    """
+    
+    for status, count in relatorio.get('resumo', {}).get('por_status', {}).items():
+        html_content += f"<tr><td>{status}</td><td>{count}</td></tr>"
+    
+    html_content += """
+        </table>
+        
+        <h2>Estágios</h2>
+        <table>
+            <tr>
+                <th>ID</th>
+                <th>Título</th>
+                <th>Cargo</th>
+                <th>Status</th>
+                <th>Empresa</th>
+                <th>Supervisor</th>
+                <th>Data Início</th>
+                <th>Data Fim</th>
+            </tr>
+    """
+    
+    for estagio in relatorio.get('estagios', []):
+        html_content += f"""
+            <tr>
+                <td>{estagio.get('id', '')}</td>
+                <td>{estagio.get('titulo', '')}</td>
+                <td>{estagio.get('cargo', '')}</td>
+                <td>{estagio.get('status_display', '')}</td>
+                <td>{estagio.get('empresa', {}).get('razao_social', '')}</td>
+                <td>{estagio.get('supervisor', {}).get('nome', '')}</td>
+                <td>{estagio.get('data_inicio', '')}</td>
+                <td>{estagio.get('data_fim', '')}</td>
+            </tr>
+        """
+    
+    html_content += """
+        </table>
+        <script>window.print();</script>
+    </body>
+    </html>
+    """
+    
+    response = HttpResponse(html_content, content_type='text/html')
+    return response
 
 
 def _gerar_relatorio_filtrado(usuario, form):
@@ -2395,14 +2685,20 @@ def _gerar_relatorio_filtrado(usuario, form):
     from .models import Estagio, Documento, Avaliacao, HorasCumpridas, Aluno
     from admin.models import CursoCoordenador, Supervisor
     
-    # Base queryset conforme perfil do usuário
-    estagios = _obter_estagios_por_perfil(usuario)
+    # Para admin/superuser/coordenador, buscar todos os estágios
+    if usuario.is_superuser or usuario.is_staff or usuario.tipo == 'coordenador':
+        estagios = Estagio.objects.all().select_related('empresa', 'supervisor', 'aluno_solicitante')
+    else:
+        # Base queryset conforme perfil do usuário
+        estagios = _obter_estagios_por_perfil(usuario)
     
-    # CA1, CA3 - Aplica filtros
-    estagios = _aplicar_filtros_relatorio(estagios, form.cleaned_data)
+    # CA1, CA3 - Aplica filtros (apenas se os campos do form estiverem preenchidos)
+    cleaned_data = form.cleaned_data if hasattr(form, 'cleaned_data') else {}
+    if cleaned_data.get('data_inicio') and cleaned_data.get('data_fim'):
+        estagios = _aplicar_filtros_relatorio(estagios, cleaned_data)
     
     # CA2 - Opções de inclusão de dados
-    opcoes = form.get_opcoes_inclusao()
+    opcoes = form.get_opcoes_inclusao() if hasattr(form, 'get_opcoes_inclusao') else {}
     
     # Monta relatório com dados completos
     relatorio = {
@@ -2412,7 +2708,7 @@ def _gerar_relatorio_filtrado(usuario, form):
             'por_status': {},
             'por_empresa': {},
         },
-        'periodo': form.get_filtros_ativos().get('periodo'),
+        'periodo': form.get_filtros_ativos().get('periodo') if hasattr(form, 'get_filtros_ativos') else None,
         'data_geracao': timezone.now().isoformat(),
     }
     
@@ -2833,7 +3129,9 @@ def candidatar_vaga(request, estagio_id):
             documento.coordenador = coordenador
             documento.versao = 1.0
             documento.tipo = 'termo_compromisso'
-            documento.nome_arquivo = documento.arquivo.name if documento.arquivo else 'documento.pdf'
+            # Truncar nome do arquivo para caber no campo (max 50 chars)
+            nome_arquivo = documento.arquivo.name if documento.arquivo else 'documento.pdf'
+            documento.nome_arquivo = nome_arquivo[:50]
             documento.enviado_por = usuario
             documento.save()
             

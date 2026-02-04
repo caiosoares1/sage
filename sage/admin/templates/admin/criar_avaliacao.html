@@ -1,0 +1,146 @@
+{% extends 'base.html' %}
+
+{% block title %}Criar Avaliação - {{ aluno.nome }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h2><i class="fas fa-star"></i> Nova Avaliação de Desempenho</h2>
+        <p class="subtitle">Crie uma avaliação para o estagiário</p>
+    </div>
+    <a href="{% url 'supervisor:listar_avaliacoes' %}" class="btn btn-secondary">
+        <i class="fas fa-arrow-left"></i> Voltar
+    </a>
+</div>
+
+{% if messages %}
+<div class="messages-container">
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }}">
+        {{ message }}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="row">
+    <div class="col-8">
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="fas fa-edit"></i> Dados da Avaliação</h3>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="info-row">
+                        <div class="info-group">
+                            <label>Aluno</label>
+                            <p><strong>{{ aluno.nome }}</strong></p>
+                        </div>
+                        <div class="info-group">
+                            <label>Estágio</label>
+                            <p><strong>{{ aluno.estagio.titulo }}</strong></p>
+                        </div>
+                    </div>
+                    
+                    <hr style="margin: 1.5rem 0;">
+                    
+                    <div class="form-group">
+                        <label for="id_periodo_inicio">Período de Avaliação - Início</label>
+                        <input type="date" name="periodo_inicio" id="id_periodo_inicio" class="form-control" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="id_periodo_fim">Período de Avaliação - Fim</label>
+                        <input type="date" name="periodo_fim" id="id_periodo_fim" class="form-control" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="id_observacoes">Observações Gerais</label>
+                        <textarea name="observacoes" id="id_observacoes" class="form-control" rows="4" 
+                                  placeholder="Observações sobre o desempenho do estagiário..."></textarea>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Criar Avaliação
+                        </button>
+                        <a href="{% url 'supervisor:listar_avaliacoes' %}" class="btn btn-secondary">
+                            Cancelar
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-4">
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="fas fa-user-graduate"></i> Informações do Aluno</h3>
+            </div>
+            <div class="card-body">
+                <div class="info-group">
+                    <label>Nome</label>
+                    <p><strong>{{ aluno.nome }}</strong></p>
+                </div>
+                <div class="info-group">
+                    <label>Matrícula</label>
+                    <p>{{ aluno.matricula }}</p>
+                </div>
+                <div class="info-group">
+                    <label>Instituição</label>
+                    <p>{{ aluno.instituicao.nome }}</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="fas fa-briefcase"></i> Estágio</h3>
+            </div>
+            <div class="card-body">
+                <div class="info-group">
+                    <label>Título</label>
+                    <p><strong>{{ aluno.estagio.titulo }}</strong></p>
+                </div>
+                <div class="info-group">
+                    <label>Empresa</label>
+                    <p>{{ aluno.estagio.empresa.razao_social }}</p>
+                </div>
+                <div class="info-group">
+                    <label>Período</label>
+                    <p>{{ aluno.estagio.data_inicio|date:"d/m/Y" }} a {{ aluno.estagio.data_fim|date:"d/m/Y" }}</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="fas fa-info-circle"></i> Instruções</h3>
+            </div>
+            <div class="card-body">
+                <p style="font-size: 0.9rem; color: var(--text-gray);">
+                    <i class="fas fa-check-circle" style="color: var(--success-color);"></i>
+                    Após criar a avaliação, você poderá preencher os critérios de avaliação.
+                </p>
+                <p style="font-size: 0.9rem; color: var(--text-gray); margin-top: 0.5rem;">
+                    <i class="fas fa-check-circle" style="color: var(--success-color);"></i>
+                    A avaliação ficará como rascunho até ser enviada.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.form-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border-color);
+}
+</style>
+{% endblock %}

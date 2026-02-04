@@ -775,6 +775,8 @@ class RelatorioEstagiosForm(forms.Form):
     FORMATO_CHOICES = [
         ('json', 'JSON'),
         ('csv', 'CSV'),
+        ('excel', 'Excel'),
+        ('pdf', 'PDF'),
     ]
     
     formato = forms.ChoiceField(
