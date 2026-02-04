@@ -4,28 +4,251 @@ from django.contrib import messages
 from django.db.models import Count, Q
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
+from django.core.paginator import Paginator
 import re
-from estagio.models import Estagio, Documento, DocumentoHistorico, Notificacao
-from .models import CursoCoordenador, Supervisor
-from .forms import SupervisorForm, SupervisorEditForm
+from estagio.models import Estagio, Documento, DocumentoHistorico, Notificacao, Aluno
+from .models import CursoCoordenador, Supervisor, Empresa, Instituicao
+from .forms import SupervisorForm, SupervisorEditForm, EmpresaForm, EmpresaEditForm, InstituicaoForm, InstituicaoEditForm
 from users.models import Usuario
 from utils.email import enviar_notificacao_email
-from utils.decorators import supervisor_required, coordenador_required
+from utils.decorators import supervisor_required, coordenador_required, admin_required
 import logging
 
 logger = logging.getLogger(__name__)
 
+# Constante para itens por página
+ITEMS_PER_PAGE = 10
+
+
+# ==================== VIEWS DE INSTITUIÇÃO ====================
+
+
+@login_required
+@admin_required
+def listar_instituicoes(request):
+    """
+    View para listar todas as instituições cadastradas com paginação.
+    """
+    instituicoes = Instituicao.objects.all().order_by('nome')
+    
+    # Filtro por nome
+    filtro_nome = request.GET.get('nome', '')
+    if filtro_nome:
+        instituicoes = instituicoes.filter(nome__icontains=filtro_nome)
+    
+    # Conta alunos e coordenadores por instituição
+    instituicoes = instituicoes.annotate(
+        total_alunos=Count('aluno'),
+        total_coordenadores=Count('cursocoordenador')
+    )
+    
+    # Paginação
+    paginator = Paginator(instituicoes, ITEMS_PER_PAGE)
+    page = request.GET.get('page')
+    instituicoes = paginator.get_page(page)
+    
+    context = {
+        'instituicoes': instituicoes,
+        'filtro_nome': filtro_nome,
+    }
+    return render(request, 'admin/listar_instituicoes.html', context)
+
+
+@login_required
+@admin_required
+def visualizar_instituicao(request, instituicao_id):
+    """View para visualizar detalhes de uma instituição"""
+    instituicao = get_object_or_404(Instituicao, id=instituicao_id)
+    
+    # Buscar alunos vinculados
+    alunos = Aluno.objects.filter(instituicao=instituicao)
+    
+    # Buscar coordenadores vinculados
+    coordenadores = CursoCoordenador.objects.filter(instituicao=instituicao)
+    
+    context = {
+        'instituicao': instituicao,
+        'alunos': alunos,
+        'coordenadores': coordenadores,
+    }
+    return render(request, 'admin/visualizar_instituicao.html', context)
+
+
+@login_required
+@admin_required
+def cadastrar_instituicao(request):
+    """
+    View para cadastrar uma nova instituição.
+    Campos obrigatórios: Nome, Contato, Endereço (rua, número, bairro)
+    """
+    if request.method == 'POST':
+        form = InstituicaoForm(request.POST)
+        if form.is_valid():
+            instituicao = form.save()
+            messages.success(request, f"Instituição '{instituicao.nome}' cadastrada com sucesso!")
+            return redirect('visualizar_instituicao', instituicao_id=instituicao.id)
+        else:
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, error)
+    else:
+        form = InstituicaoForm()
+    
+    context = {
+        'form': form,
+    }
+    return render(request, 'admin/cadastrar_instituicao.html', context)
+
+
+@login_required
+@admin_required
+def editar_instituicao(request, instituicao_id):
+    """
+    View para editar uma instituição existente.
+    """
+    instituicao = get_object_or_404(Instituicao, id=instituicao_id)
+    
+    if request.method == 'POST':
+        form = InstituicaoEditForm(request.POST, instance=instituicao)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f"Instituição '{instituicao.nome}' atualizada com sucesso!")
+            return redirect('visualizar_instituicao', instituicao_id=instituicao.id)
+        else:
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, error)
+    else:
+        form = InstituicaoEditForm(instance=instituicao)
+    
+    context = {
+        'form': form,
+        'instituicao': instituicao,
+    }
+    return render(request, 'admin/editar_instituicao.html', context)
+
+
 # ==================== VIEWS DE EMPRESA ====================
-# As views de Empresa foram migradas para a API REST.
-# Use os endpoints em /api/empresas/ para gerenciar empresas.
-# Veja admin/api_views.py e admin/serializers.py para detalhes.
+# Sprint 03 - TASK 22167 - Criar tela de cadastro de empresa com campos obrigatórios
+
+
+@login_required
+@admin_required
+def listar_empresas(request):
+    """
+    View para listar todas as empresas cadastradas.
+    TASK 22167 - Listagem de empresas com filtros e paginação
+    """
+    empresas = Empresa.objects.all().order_by('razao_social')
+    
+    # Filtro por razão social
+    filtro_razao = request.GET.get('razao', '')
+    if filtro_razao:
+        empresas = empresas.filter(razao_social__icontains=filtro_razao)
+    
+    # Filtro por CNPJ
+    filtro_cnpj = request.GET.get('cnpj', '')
+    if filtro_cnpj:
+        empresas = empresas.filter(cnpj__icontains=filtro_cnpj)
+    
+    # Conta supervisores por empresa
+    empresas = empresas.annotate(total_supervisores=Count('supervisor'))
+    
+    # Paginação
+    paginator = Paginator(empresas, ITEMS_PER_PAGE)
+    page = request.GET.get('page')
+    empresas = paginator.get_page(page)
+    
+    context = {
+        'empresas': empresas,
+        'filtro_razao': filtro_razao,
+        'filtro_cnpj': filtro_cnpj,
+    }
+    return render(request, 'admin/listar_empresas.html', context)
+
+
+@login_required
+@admin_required
+def visualizar_empresa(request, empresa_id):
+    """View para visualizar detalhes de uma empresa"""
+    empresa = get_object_or_404(Empresa, id=empresa_id)
+    
+    # Buscar supervisores vinculados
+    supervisores = Supervisor.objects.filter(empresa=empresa)
+    
+    # Buscar estágios da empresa
+    estagios = Estagio.objects.filter(empresa=empresa)
+    
+    context = {
+        'empresa': empresa,
+        'supervisores': supervisores,
+        'estagios': estagios,
+    }
+    return render(request, 'admin/visualizar_empresa.html', context)
+
+
+@login_required
+@admin_required
+def cadastrar_empresa(request):
+    """
+    View para cadastrar uma nova empresa.
+    TASK 22167 - [FRONT] Criar tela de cadastro de empresa com campos obrigatórios
+    
+    Campos obrigatórios: CNPJ, Razão Social, Endereço (rua, número, bairro)
+    """
+    if request.method == 'POST':
+        form = EmpresaForm(request.POST)
+        if form.is_valid():
+            empresa = form.save()
+            messages.success(request, f"Empresa '{empresa.razao_social}' cadastrada com sucesso!")
+            return redirect('visualizar_empresa', empresa_id=empresa.id)
+        else:
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, error)
+    else:
+        form = EmpresaForm()
+    
+    context = {
+        'form': form,
+    }
+    return render(request, 'admin/cadastrar_empresa.html', context)
+
+
+@login_required
+@admin_required
+def editar_empresa(request, empresa_id):
+    """
+    View para editar uma empresa existente.
+    """
+    empresa = get_object_or_404(Empresa, id=empresa_id)
+    
+    if request.method == 'POST':
+        form = EmpresaEditForm(request.POST, instance=empresa)
+        if form.is_valid():
+            empresa = form.save()
+            messages.success(request, f"Empresa '{empresa.razao_social}' atualizada com sucesso!")
+            return redirect('visualizar_empresa', empresa_id=empresa.id)
+        else:
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, error)
+    else:
+        form = EmpresaEditForm(instance=empresa)
+    
+    context = {
+        'form': form,
+        'empresa': empresa,
+    }
+    return render(request, 'admin/editar_empresa.html', context)
 
 
 # ==================== VIEWS DE SUPERVISOR ====================
 
 @login_required
+@admin_required
 def listar_supervisores(request):
-    """View para listar todos os supervisores cadastrados"""
+    """View para listar todos os supervisores cadastrados com paginação"""
     supervisores = Supervisor.objects.all().select_related('empresa', 'usuario').order_by('nome')
     
     # Filtro por nome
@@ -38,6 +261,11 @@ def listar_supervisores(request):
     if filtro_empresa:
         supervisores = supervisores.filter(empresa__razao_social__icontains=filtro_empresa)
     
+    # Paginação
+    paginator = Paginator(supervisores, ITEMS_PER_PAGE)
+    page = request.GET.get('page')
+    supervisores = paginator.get_page(page)
+    
     context = {
         'supervisores': supervisores,
         'filtro_nome': filtro_nome,
@@ -47,6 +275,7 @@ def listar_supervisores(request):
 
 
 @login_required
+@admin_required
 def visualizar_supervisor(request, supervisor_id):
     """View para visualizar detalhes de um supervisor"""
     supervisor = get_object_or_404(
@@ -65,6 +294,7 @@ def visualizar_supervisor(request, supervisor_id):
 
 
 @login_required
+@admin_required
 def cadastrar_supervisor(request):
     """
     View para cadastrar um novo supervisor vinculado a uma empresa.
@@ -92,6 +322,7 @@ def cadastrar_supervisor(request):
 
 
 @login_required
+@admin_required
 def editar_supervisor(request, supervisor_id):
     """
     View para editar um supervisor existente.
@@ -1719,4 +1950,174 @@ def alternar_disponibilidade_parecer(request, avaliacao_id):
     except (Usuario.DoesNotExist, Supervisor.DoesNotExist):
         messages.error(request, "Supervisor não encontrado!")
         return redirect('dashboard')
+
+
+# ==================== PAINEL DE ESTÁGIOS ====================
+# Sprint 03 - TASK 22208, 22209
+
+@login_required
+@coordenador_required
+def painel_estagios(request):
+    """
+    View para exibir o painel administrativo de estágios.
+    TASK 22208 - Criar painel de visualização de estágios
+    TASK 22209 - Implementar exibição de estágios por status
+    """
+    from estagio.models import Atividade
+    from django.core.paginator import Paginator
+    
+    # Estatísticas gerais
+    total_estagios = Estagio.objects.count()
+    estagios_ativos = Estagio.objects.filter(status='ativo').count()
+    estagios_concluidos = Estagio.objects.filter(status='concluido').count()
+    estagios_pendentes = Estagio.objects.filter(status='pendente').count()
+    
+    # Buscar estágios com filtros
+    estagios = Estagio.objects.all().select_related(
+        'aluno', 'aluno__usuario', 'empresa', 'supervisor', 'supervisor__usuario'
+    ).order_by('-data_inicio')
+    
+    # Filtros
+    filtro_status = request.GET.get('status', '')
+    filtro_empresa = request.GET.get('empresa', '')
+    filtro_curso = request.GET.get('curso', '')
+    
+    if filtro_status:
+        estagios = estagios.filter(status=filtro_status)
+    
+    if filtro_empresa:
+        estagios = estagios.filter(empresa_id=filtro_empresa)
+    
+    if filtro_curso:
+        estagios = estagios.filter(aluno__curso_id=filtro_curso)
+    
+    # Calcular percentual de conclusão para cada estágio
+    for estagio in estagios:
+        if hasattr(estagio, 'carga_horaria_total') and estagio.carga_horaria_total:
+            horas_cumpridas = Atividade.objects.filter(
+                estagio=estagio, 
+                status='aprovada'
+            ).aggregate(total=Count('horas'))['total'] or 0
+            estagio.horas_cumpridas = horas_cumpridas
+            estagio.percentual_conclusao = min(100, (horas_cumpridas / estagio.carga_horaria_total) * 100)
+        else:
+            estagio.horas_cumpridas = 0
+            estagio.percentual_conclusao = 0
+    
+    # Paginação
+    paginator = Paginator(estagios, 20)
+    page = request.GET.get('page')
+    estagios = paginator.get_page(page)
+    
+    # Buscar empresas e cursos para filtros
+    empresas = Empresa.objects.all().order_by('razao_social')
+    cursos = CursoCoordenador.objects.values('curso_id', 'curso__nome').distinct()
+    
+    context = {
+        'total_estagios': total_estagios,
+        'estagios_ativos': estagios_ativos,
+        'estagios_concluidos': estagios_concluidos,
+        'estagios_pendentes': estagios_pendentes,
+        'estagios': estagios,
+        'empresas': empresas,
+        'cursos': cursos,
+        'filtro_status': filtro_status,
+        'filtro_empresa': filtro_empresa,
+        'filtro_curso': filtro_curso,
+    }
+    return render(request, 'admin/painel_estagios.html', context)
+
+
+# ==================== MONITORAMENTO DE PENDÊNCIAS ====================
+# Sprint 03 - TASK 22213, 22214
+
+@login_required
+@coordenador_required
+def monitoramento_pendencias(request):
+    """
+    View para monitoramento de pendências por tipo.
+    TASK 22213 - Criar listagem de pendências por tipo
+    TASK 22214 - Implementar destaque visual para pendências críticas
+    """
+    from estagio.models import Atividade, Avaliacao
+    from datetime import date, timedelta
+    
+    # Filtros
+    filtro_tipo = request.GET.get('tipo', '')
+    filtro_prioridade = request.GET.get('prioridade', '')
+    filtro_responsavel = request.GET.get('responsavel', '')
+    
+    hoje = date.today()
+    
+    # Documentos pendentes
+    documentos_pendentes = Documento.objects.filter(
+        status__in=['pendente', 'em_analise']
+    ).select_related('estagio', 'estagio__aluno', 'estagio__aluno__usuario')
+    
+    for doc in documentos_pendentes:
+        if hasattr(doc, 'prazo_entrega') and doc.prazo_entrega:
+            delta = (doc.prazo_entrega - hoje).days
+            if delta < 0:
+                doc.dias_atraso = abs(delta)
+                doc.dias_restantes = 0
+                doc.prioridade = 'critica'
+            elif delta <= 3:
+                doc.dias_atraso = 0
+                doc.dias_restantes = delta
+                doc.prioridade = 'alta'
+            elif delta <= 7:
+                doc.dias_atraso = 0
+                doc.dias_restantes = delta
+                doc.prioridade = 'media'
+            else:
+                doc.dias_atraso = 0
+                doc.dias_restantes = delta
+                doc.prioridade = 'baixa'
+    
+    # Atividades pendentes de confirmação
+    atividades_pendentes = Atividade.objects.filter(
+        status='pendente'
+    ).select_related('estagio', 'estagio__aluno', 'estagio__aluno__usuario')
+    
+    # Avaliações pendentes
+    avaliacoes_pendentes = []
+    estagios_sem_avaliacao = Estagio.objects.filter(
+        status='concluido'
+    ).exclude(
+        id__in=Avaliacao.objects.values_list('estagio_id', flat=True)
+    ).select_related('aluno', 'aluno__usuario', 'empresa')
+    
+    for estagio in estagios_sem_avaliacao:
+        avaliacoes_pendentes.append({
+            'estagio': estagio,
+            'prioridade': 'alta',
+        })
+    
+    # Relatórios pendentes (placeholder - depende da estrutura do modelo)
+    relatorios_pendentes = []
+    
+    # Contadores por prioridade
+    pendencias_criticas = sum(1 for d in documentos_pendentes if getattr(d, 'prioridade', '') == 'critica')
+    pendencias_alta = sum(1 for d in documentos_pendentes if getattr(d, 'prioridade', '') == 'alta') + len(avaliacoes_pendentes)
+    pendencias_media = sum(1 for d in documentos_pendentes if getattr(d, 'prioridade', '') == 'media') + atividades_pendentes.count()
+    pendencias_baixa = sum(1 for d in documentos_pendentes if getattr(d, 'prioridade', '') == 'baixa')
+    
+    # Aplicar filtros
+    if filtro_prioridade:
+        documentos_pendentes = [d for d in documentos_pendentes if getattr(d, 'prioridade', '') == filtro_prioridade]
+    
+    context = {
+        'documentos_pendentes': documentos_pendentes[:10],
+        'atividades_pendentes': atividades_pendentes[:10],
+        'avaliacoes_pendentes': avaliacoes_pendentes[:10],
+        'relatorios_pendentes': relatorios_pendentes,
+        'pendencias_criticas': pendencias_criticas,
+        'pendencias_alta': pendencias_alta,
+        'pendencias_media': pendencias_media,
+        'pendencias_baixa': pendencias_baixa,
+        'filtro_tipo': filtro_tipo,
+        'filtro_prioridade': filtro_prioridade,
+        'filtro_responsavel': filtro_responsavel,
+    }
+    return render(request, 'admin/monitoramento_pendencias.html', context)
 

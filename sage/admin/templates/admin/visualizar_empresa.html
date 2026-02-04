@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ empresa.razao_social }} - Sistema de Gestão de Estágios{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h2><i class="fas fa-building"></i> {{ empresa.razao_social }}</h2>
+        <div class="header-actions">
+            <a href="{% url 'editar_empresa' empresa.id %}" class="btn btn-warning">
+                <i class="fas fa-edit"></i> Editar
+            </a>
+            <a href="{% url 'listar_empresas' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Voltar
+            </a>
+        </div>
+    </div>
+
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <!-- Dados da Empresa -->
+        <div class="col-6">
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-info-circle"></i> Dados da Empresa</h3>
+                </div>
+                <div class="card-body">
+                    <div class="info-group">
+                        <label>CNPJ</label>
+                        <p>{{ empresa.cnpj }}</p>
+                    </div>
+                    <div class="info-group">
+                        <label>Razão Social</label>
+                        <p>{{ empresa.razao_social }}</p>
+                    </div>
+                    <div class="info-group">
+                        <label>Endereço</label>
+                        <p>{{ empresa.rua }}, {{ empresa.numero }} - {{ empresa.bairro }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Supervisores Vinculados -->
+        <div class="col-6">
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-users"></i> Supervisores Vinculados</h3>
+                    <a href="{% url 'cadastrar_supervisor' %}" class="btn btn-sm btn-primary">
+                        <i class="fas fa-plus"></i> Novo Supervisor
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if supervisores %}
+                    <ul class="list-supervisores">
+                        {% for supervisor in supervisores %}
+                        <li>
+                            <a href="{% url 'visualizar_supervisor' supervisor.id %}">
+                                <i class="fas fa-user"></i> {{ supervisor.nome }}
+                            </a>
+                            <span class="cargo">{{ supervisor.cargo }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="text-muted">Nenhum supervisor vinculado a esta empresa.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Estágios da Empresa -->
+    <div class="card mt-4">
+        <div class="card-header">
+            <h3><i class="fas fa-briefcase"></i> Estágios na Empresa</h3>
+        </div>
+        <div class="card-body">
+            {% if estagios %}
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Título</th>
+                            <th>Cargo</th>
+                            <th>Status</th>
+                            <th>Status Vaga</th>
+                            <th>Período</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for estagio in estagios %}
+                        <tr>
+                            <td>{{ estagio.titulo }}</td>
+                            <td>{{ estagio.cargo }}</td>
+                            <td>
+                                <span class="badge badge-{{ estagio.status }}">
+                                    {{ estagio.get_status_display }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge badge-{{ estagio.status_vaga }}">
+                                    {{ estagio.get_status_vaga_display }}
+                                </span>
+                            </td>
+                            <td>{{ estagio.data_inicio|date:"d/m/Y" }} - {{ estagio.data_fim|date:"d/m/Y" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted">Nenhum estágio vinculado a esta empresa.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

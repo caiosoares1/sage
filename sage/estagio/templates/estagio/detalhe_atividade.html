@@ -1,0 +1,220 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ atividade.titulo }} - Detalhes da Atividade{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h2><i class="fas fa-clipboard-check"></i> Detalhes da Atividade</h2>
+        <a href="{% url 'listar_atividades_pendentes' %}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Voltar
+        </a>
+    </div>
+
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <div class="col-8">
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-info-circle"></i> Informações da Atividade</h3>
+                    <span class="badge badge-{{ atividade.status }}">
+                        {{ atividade.get_status_display }}
+                    </span>
+                </div>
+                <div class="card-body">
+                    <div class="info-group">
+                        <label>Título</label>
+                        <p><strong>{{ atividade.titulo }}</strong></p>
+                    </div>
+                    <div class="info-group">
+                        <label>Descrição</label>
+                        <p>{{ atividade.descricao }}</p>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-group">
+                            <label>Data de Realização</label>
+                            <p>{{ atividade.data_realizacao|date:"d/m/Y" }}</p>
+                        </div>
+                        <div class="info-group">
+                            <label>Horas Dedicadas</label>
+                            <p>{{ atividade.horas_dedicadas }} horas</p>
+                        </div>
+                    </div>
+                    <div class="info-row">
+                        <div class="info-group">
+                            <label>Data de Registro</label>
+                            <p>{{ atividade.data_registro|date:"d/m/Y H:i" }}</p>
+                        </div>
+                        {% if atividade.data_confirmacao %}
+                        <div class="info-group">
+                            <label>Data de Processamento</label>
+                            <p>{{ atividade.data_confirmacao|date:"d/m/Y H:i" }}</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    {% if atividade.justificativa_rejeicao %}
+                    <div class="info-group alert-danger-box">
+                        <label><i class="fas fa-exclamation-triangle"></i> Justificativa da Rejeição</label>
+                        <p>{{ atividade.justificativa_rejeicao }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                {% if atividade.status == 'pendente' %}
+                <div class="card-footer">
+                    <form method="post" action="{% url 'confirmar_atividade' atividade.id %}" style="display: inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-success" onclick="return confirm('Confirmar esta atividade?');">
+                            <i class="fas fa-check"></i> Confirmar Atividade
+                        </button>
+                    </form>
+                    
+                    <button type="button" class="btn btn-danger" onclick="document.getElementById('form-rejeicao').style.display='block'">
+                        <i class="fas fa-times"></i> Rejeitar Atividade
+                    </button>
+                    
+                    <div id="form-rejeicao" style="display: none; margin-top: 20px;">
+                        <form method="post" action="{% url 'rejeitar_atividade' atividade.id %}">
+                            {% csrf_token %}
+                            <div class="form-group">
+                                <label for="justificativa" class="required">Justificativa da Rejeição</label>
+                                <textarea name="justificativa" id="justificativa" class="form-control" 
+                                          rows="4" required minlength="10"
+                                          placeholder="Informe o motivo da rejeição (mínimo 10 caracteres)..."></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-times"></i> Confirmar Rejeição
+                            </button>
+                            <button type="button" class="btn btn-secondary" 
+                                    onclick="document.getElementById('form-rejeicao').style.display='none'">
+                                Cancelar
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="col-4">
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-user"></i> Aluno</h3>
+                </div>
+                <div class="card-body">
+                    <p><strong>{{ atividade.aluno.nome }}</strong></p>
+                    <p>Matrícula: {{ atividade.aluno.matricula }}</p>
+                </div>
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h3><i class="fas fa-briefcase"></i> Estágio</h3>
+                </div>
+                <div class="card-body">
+                    <p><strong>{{ atividade.estagio.titulo }}</strong></p>
+                    <p>{{ atividade.estagio.empresa.razao_social }}</p>
+                </div>
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h3><i class="fas fa-history"></i> Histórico</h3>
+                </div>
+                <div class="card-body">
+                    {% if historico %}
+                    <ul class="timeline">
+                        {% for item in historico %}
+                        <li class="timeline-item">
+                            <span class="timeline-badge badge-{{ item.acao }}">
+                                {% if item.acao == 'confirmada' %}
+                                <i class="fas fa-check"></i>
+                                {% elif item.acao == 'rejeitada' %}
+                                <i class="fas fa-times"></i>
+                                {% else %}
+                                <i class="fas fa-plus"></i>
+                                {% endif %}
+                            </span>
+                            <div class="timeline-content">
+                                <strong>{{ item.get_acao_display }}</strong>
+                                <br><small>{{ item.data_hora|date:"d/m/Y H:i" }}</small>
+                                {% if item.supervisor %}
+                                <br><small>Por: {{ item.supervisor.nome }}</small>
+                                {% endif %}
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="text-muted">Nenhum histórico disponível.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.info-row {
+    display: flex;
+    gap: 30px;
+}
+
+.alert-danger-box {
+    background: #f8d7da;
+    padding: 15px;
+    border-radius: 8px;
+    border-left: 4px solid #dc3545;
+}
+
+.timeline {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.timeline-item {
+    display: flex;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.timeline-item:last-child {
+    border-bottom: none;
+}
+
+.timeline-badge {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    flex-shrink: 0;
+}
+
+.badge-confirmada {
+    background: #28a745;
+}
+
+.badge-rejeitada {
+    background: #dc3545;
+}
+
+.badge-registrada {
+    background: #17a2b8;
+}
+</style>
+{% endblock %}

@@ -1,0 +1,253 @@
+{% extends 'base.html' %}
+
+{% block title %}Relatórios de Estágios - Sistema de Gestão de Estágios{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h2><i class="fas fa-chart-bar"></i> Relatórios de Estágios</h2>
+        <p class="subtitle">Gere relatórios personalizados com base nos filtros selecionados</p>
+    </div>
+
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <!-- Filtros de Relatório -->
+        <div class="col-4">
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-filter"></i> Filtros do Relatório</h3>
+                </div>
+                <div class="card-body">
+                    <form method="get" id="form-relatorio">
+                        <div class="form-group">
+                            <label for="tipo_relatorio" class="required">Tipo de Relatório</label>
+                            <select name="tipo" id="tipo_relatorio" class="form-control">
+                                <option value="">Selecione o tipo...</option>
+                                <option value="estagios_ativos" {% if filtro_tipo == 'estagios_ativos' %}selected{% endif %}>
+                                    Estágios Ativos
+                                </option>
+                                <option value="estagios_concluidos" {% if filtro_tipo == 'estagios_concluidos' %}selected{% endif %}>
+                                    Estágios Concluídos
+                                </option>
+                                <option value="horas_estagiarios" {% if filtro_tipo == 'horas_estagiarios' %}selected{% endif %}>
+                                    Horas por Estagiário
+                                </option>
+                                <option value="desempenho_alunos" {% if filtro_tipo == 'desempenho_alunos' %}selected{% endif %}>
+                                    Desempenho dos Alunos
+                                </option>
+                                <option value="empresas_parceiras" {% if filtro_tipo == 'empresas_parceiras' %}selected{% endif %}>
+                                    Empresas Parceiras
+                                </option>
+                                <option value="documentos_pendentes" {% if filtro_tipo == 'documentos_pendentes' %}selected{% endif %}>
+                                    Documentos Pendentes
+                                </option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="periodo_inicio">Período Início</label>
+                            <input type="date" name="periodo_inicio" id="periodo_inicio" 
+                                   class="form-control" value="{{ filtro_periodo_inicio }}">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="periodo_fim">Período Fim</label>
+                            <input type="date" name="periodo_fim" id="periodo_fim" 
+                                   class="form-control" value="{{ filtro_periodo_fim }}">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="empresa">Empresa</label>
+                            <select name="empresa" id="empresa" class="form-control">
+                                <option value="">Todas as empresas</option>
+                                {% for empresa in empresas %}
+                                <option value="{{ empresa.id }}" {% if filtro_empresa == empresa.id|stringformat:"s" %}selected{% endif %}>
+                                    {{ empresa.nome }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="curso">Curso</label>
+                            <select name="curso" id="curso" class="form-control">
+                                <option value="">Todos os cursos</option>
+                                {% for curso in cursos %}
+                                <option value="{{ curso.id }}" {% if filtro_curso == curso.id|stringformat:"s" %}selected{% endif %}>
+                                    {{ curso.nome }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="status">Status do Estágio</label>
+                            <select name="status" id="status" class="form-control">
+                                <option value="">Todos os status</option>
+                                <option value="ativo" {% if filtro_status == 'ativo' %}selected{% endif %}>Ativo</option>
+                                <option value="pendente" {% if filtro_status == 'pendente' %}selected{% endif %}>Pendente</option>
+                                <option value="concluido" {% if filtro_status == 'concluido' %}selected{% endif %}>Concluído</option>
+                                <option value="cancelado" {% if filtro_status == 'cancelado' %}selected{% endif %}>Cancelado</option>
+                            </select>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary btn-block">
+                                <i class="fas fa-search"></i> Gerar Relatório
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Opções de Exportação -->
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h3><i class="fas fa-download"></i> Exportar Dados</h3>
+                </div>
+                <div class="card-body">
+                    <p class="help-text">Exporte os dados do relatório gerado nos formatos disponíveis:</p>
+                    
+                    <div class="export-buttons">
+                        <button type="button" class="btn btn-success btn-block mb-2" 
+                                onclick="exportarRelatorio('excel')" {% if not dados %}disabled{% endif %}>
+                            <i class="fas fa-file-excel"></i> Exportar para Excel
+                        </button>
+                        <button type="button" class="btn btn-danger btn-block mb-2" 
+                                onclick="exportarRelatorio('pdf')" {% if not dados %}disabled{% endif %}>
+                            <i class="fas fa-file-pdf"></i> Exportar para PDF
+                        </button>
+                        <button type="button" class="btn btn-info btn-block" 
+                                onclick="exportarRelatorio('csv')" {% if not dados %}disabled{% endif %}>
+                            <i class="fas fa-file-csv"></i> Exportar para CSV
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Resultado do Relatório -->
+        <div class="col-8">
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-table"></i> Resultado do Relatório</h3>
+                    {% if dados %}
+                    <span class="badge badge-primary">{{ dados|length }} registro(s)</span>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    {% if dados %}
+                    <div class="table-responsive">
+                        <table class="table" id="tabela-relatorio">
+                            <thead>
+                                <tr>
+                                    {% for coluna in colunas %}
+                                    <th>{{ coluna }}</th>
+                                    {% endfor %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for linha in dados %}
+                                <tr>
+                                    {% for valor in linha %}
+                                    <td>{{ valor }}</td>
+                                    {% endfor %}
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Resumo -->
+                    {% if resumo %}
+                    <div class="relatorio-resumo mt-4">
+                        <h4><i class="fas fa-chart-pie"></i> Resumo</h4>
+                        <div class="resumo-grid">
+                            {% for item in resumo %}
+                            <div class="resumo-item">
+                                <span class="resumo-label">{{ item.label }}</span>
+                                <span class="resumo-valor">{{ item.valor }}</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% else %}
+                    <div class="empty-state">
+                        <i class="fas fa-chart-bar fa-3x"></i>
+                        <h3>Selecione os filtros para gerar o relatório</h3>
+                        <p>Use os filtros à esquerda para definir os critérios do relatório desejado.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function exportarRelatorio(formato) {
+    const params = new URLSearchParams(window.location.search);
+    params.set('formato', formato);
+    params.set('exportar', 'true');
+    
+    // Redireciona para a URL de exportação
+    window.location.href = '{% url "estagio:api_relatorio_exportar" %}?' + params.toString();
+}
+</script>
+
+<style>
+.export-buttons button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.relatorio-resumo {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+}
+
+.resumo-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.resumo-item {
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    text-align: center;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.resumo-label {
+    display: block;
+    color: #666;
+    font-size: 0.9em;
+    margin-bottom: 5px;
+}
+
+.resumo-valor {
+    display: block;
+    font-size: 1.5em;
+    font-weight: bold;
+    color: #333;
+}
+
+.card-header .badge {
+    float: right;
+}
+</style>
+{% endblock %}

@@ -1082,6 +1082,9 @@ class PainelEstagiosViewBaseTest(TestCase):
         self.coordenador = CursoCoordenador.objects.create(
             usuario=self.usuario_coordenador,
             nome="Coordenador Teste",
+            nome_curso="Ciência da Computação",
+            codigo_curso=123,
+            carga_horaria=40,
             contato="11977777777",
             instituicao=self.instituicao
         )
@@ -1694,6 +1697,9 @@ class MonitoramentoPendenciasBaseTest(TestCase):
         self.coordenador = CursoCoordenador.objects.create(
             usuario=self.usuario_coordenador,
             nome="Coordenador Teste",
+            nome_curso="Ciência da Computação",
+            codigo_curso=123,
+            carga_horaria=40,
             contato="11977777777",
             instituicao=self.instituicao
         )
@@ -2240,6 +2246,9 @@ class FuncoesAuxiliaresMonitoramentoTest(TestCase):
         CursoCoordenador.objects.create(
             usuario=usuario,
             nome="Coord",
+            nome_curso="Ciência da Computação",
+            codigo_curso=123,
+            carga_horaria=40,
             contato="111111",
             instituicao=self.instituicao
         )
@@ -2318,6 +2327,9 @@ class RelatorioEstagiosBaseTest(TestCase):
         self.coordenador = CursoCoordenador.objects.create(
             usuario=self.usuario_coordenador,
             nome="Coordenador Relatório",
+            nome_curso="Ciência da Computação",
+            codigo_curso=123,
+            carga_horaria=40,
             contato="11999998888",
             instituicao=self.instituicao
         )

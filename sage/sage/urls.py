@@ -23,7 +23,7 @@ from django.contrib.auth import views as auth_views
 from estagio.views import cadastrar_aluno
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    path('django-admin/', admin.site.urls),  # Django Admin (renomeado)
     path('', TemplateView.as_view(template_name='dashboard.html'), name='dashboard'),
     path('login/', auth_views.LoginView.as_view(template_name='login.html'), name='login'),
     path('logout/', auth_views.LogoutView.as_view(next_page='login'), name='logout'),
@@ -41,6 +41,9 @@ urlpatterns = [
     path('supervisor/', include('admin.urls_supervisor')),  # Supervisor
     path('coordenador/', include('admin.urls_coordenador')),  # Coordenador
     path('usuarios/', include('users.urls')),  # Gestão de Usuários
+    
+    # Gestão administrativa (empresas, instituições, supervisores)
+    path('gestao/', include('admin.urls')),
 ]
 
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -1,0 +1,293 @@
+{% extends 'base.html' %}
+
+{% block title %}Painel de Estágios - Sistema de Gestão de Estágios{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h2><i class="fas fa-tachometer-alt"></i> Painel de Estágios</h2>
+        <p class="subtitle">Visão geral de todos os estágios do sistema</p>
+    </div>
+
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Cards de Resumo -->
+    <div class="estatisticas-grid">
+        <div class="stat-card stat-total">
+            <div class="stat-icon">
+                <i class="fas fa-clipboard-list"></i>
+            </div>
+            <div class="stat-info">
+                <span class="stat-value">{{ total_estagios }}</span>
+                <span class="stat-label">Total de Estágios</span>
+            </div>
+        </div>
+        
+        <div class="stat-card stat-ativos">
+            <div class="stat-icon">
+                <i class="fas fa-play-circle"></i>
+            </div>
+            <div class="stat-info">
+                <span class="stat-value">{{ estagios_ativos }}</span>
+                <span class="stat-label">Estágios Ativos</span>
+            </div>
+        </div>
+        
+        <div class="stat-card stat-concluidos">
+            <div class="stat-icon">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="stat-info">
+                <span class="stat-value">{{ estagios_concluidos }}</span>
+                <span class="stat-label">Estágios Concluídos</span>
+            </div>
+        </div>
+        
+        <div class="stat-card stat-pendentes">
+            <div class="stat-icon">
+                <i class="fas fa-clock"></i>
+            </div>
+            <div class="stat-info">
+                <span class="stat-value">{{ estagios_pendentes }}</span>
+                <span class="stat-label">Estágios Pendentes</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="card filtros-card mt-4">
+        <div class="card-body">
+            <form method="get" class="filtros-form">
+                <div class="form-row">
+                    <div class="form-group col-3">
+                        <label for="status">Status</label>
+                        <select name="status" id="status" class="form-control">
+                            <option value="">Todos os status</option>
+                            <option value="ativo" {% if filtro_status == 'ativo' %}selected{% endif %}>Ativo</option>
+                            <option value="pendente" {% if filtro_status == 'pendente' %}selected{% endif %}>Pendente</option>
+                            <option value="concluido" {% if filtro_status == 'concluido' %}selected{% endif %}>Concluído</option>
+                            <option value="cancelado" {% if filtro_status == 'cancelado' %}selected{% endif %}>Cancelado</option>
+                        </select>
+                    </div>
+                    <div class="form-group col-3">
+                        <label for="empresa">Empresa</label>
+                        <select name="empresa" id="empresa" class="form-control">
+                            <option value="">Todas as empresas</option>
+                            {% for empresa in empresas %}
+                            <option value="{{ empresa.id }}" {% if filtro_empresa == empresa.id|stringformat:"s" %}selected{% endif %}>
+                                {{ empresa.nome }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group col-3">
+                        <label for="curso">Curso</label>
+                        <select name="curso" id="curso" class="form-control">
+                            <option value="">Todos os cursos</option>
+                            {% for curso in cursos %}
+                            <option value="{{ curso.id }}" {% if filtro_curso == curso.id|stringformat:"s" %}selected{% endif %}>
+                                {{ curso.nome }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group col-3 align-self-end">
+                        <button type="submit" class="btn btn-secondary btn-block">
+                            <i class="fas fa-search"></i> Filtrar
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Estágios por Status -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-list"></i> Lista de Estágios</h3>
+                </div>
+                <div class="card-body">
+                    {% if estagios %}
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Aluno</th>
+                                    <th>Empresa</th>
+                                    <th>Supervisor</th>
+                                    <th>Período</th>
+                                    <th>Carga Horária</th>
+                                    <th>Status</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for estagio in estagios %}
+                                <tr class="estagio-row status-{{ estagio.status }}">
+                                    <td>
+                                        <strong>{{ estagio.aluno.usuario.first_name }} {{ estagio.aluno.usuario.last_name }}</strong>
+                                        <br>
+                                        <small class="text-muted">{{ estagio.aluno.curso.nome }}</small>
+                                    </td>
+                                    <td>{{ estagio.empresa.nome }}</td>
+                                    <td>{{ estagio.supervisor.usuario.first_name }} {{ estagio.supervisor.usuario.last_name }}</td>
+                                    <td>
+                                        {{ estagio.data_inicio|date:"d/m/Y" }}
+                                        <br>
+                                        <small>até {{ estagio.data_fim|date:"d/m/Y" }}</small>
+                                    </td>
+                                    <td>
+                                        <span class="horas-badge">
+                                            {{ estagio.horas_cumpridas|default:0 }} / {{ estagio.carga_horaria_total }}h
+                                        </span>
+                                        <div class="progress-mini">
+                                            <div class="progress-bar" style="width: {{ estagio.percentual_conclusao }}%;"></div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        {% if estagio.status == 'ativo' %}
+                                        <span class="badge badge-success">Ativo</span>
+                                        {% elif estagio.status == 'pendente' %}
+                                        <span class="badge badge-warning">Pendente</span>
+                                        {% elif estagio.status == 'concluido' %}
+                                        <span class="badge badge-primary">Concluído</span>
+                                        {% elif estagio.status == 'cancelado' %}
+                                        <span class="badge badge-danger">Cancelado</span>
+                                        {% else %}
+                                        <span class="badge badge-secondary">{{ estagio.get_status_display }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="actions">
+                                        <a href="{% url 'estagio:detalhe_estagio' estagio.id %}" class="btn btn-sm btn-info" title="Ver Detalhes">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        {% if estagio.status == 'ativo' %}
+                                        <a href="{% url 'estagio:atividades' estagio.id %}" class="btn btn-sm btn-secondary" title="Atividades">
+                                            <i class="fas fa-tasks"></i>
+                                        </a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Paginação -->
+                    {% if estagios.has_other_pages %}
+                    <nav class="pagination-container">
+                        <ul class="pagination">
+                            {% if estagios.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page=1{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}">&laquo; Primeira</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ estagios.previous_page_number }}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}">Anterior</a>
+                            </li>
+                            {% endif %}
+                            
+                            <li class="page-item active">
+                                <span class="page-link">Página {{ estagios.number }} de {{ estagios.paginator.num_pages }}</span>
+                            </li>
+                            
+                            {% if estagios.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ estagios.next_page_number }}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}">Próxima</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ estagios.paginator.num_pages }}{% if request.GET.status %}&status={{ request.GET.status }}{% endif %}">Última &raquo;</a>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                    {% endif %}
+                    {% else %}
+                    <div class="empty-state">
+                        <i class="fas fa-clipboard-list fa-3x"></i>
+                        <h3>Nenhum estágio encontrado</h3>
+                        <p>Não existem estágios cadastrados com os filtros selecionados.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.estatisticas-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+}
+
+.stat-card {
+    background: white;
+    border-radius: 10px;
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.stat-icon {
+    font-size: 2em;
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+}
+
+.stat-total .stat-icon { background: #e3f2fd; color: #1976d2; }
+.stat-ativos .stat-icon { background: #e8f5e9; color: #388e3c; }
+.stat-concluidos .stat-icon { background: #f3e5f5; color: #7b1fa2; }
+.stat-pendentes .stat-icon { background: #fff3e0; color: #f57c00; }
+
+.stat-value {
+    display: block;
+    font-size: 1.8em;
+    font-weight: bold;
+    color: #333;
+}
+
+.stat-label {
+    color: #666;
+}
+
+.progress-mini {
+    height: 4px;
+    background: #e0e0e0;
+    border-radius: 2px;
+    margin-top: 5px;
+}
+
+.progress-mini .progress-bar {
+    background: #4caf50;
+    height: 100%;
+    border-radius: 2px;
+}
+
+.estagio-row.status-ativo { border-left: 3px solid #28a745; }
+.estagio-row.status-pendente { border-left: 3px solid #ffc107; }
+.estagio-row.status-concluido { border-left: 3px solid #6f42c1; }
+.estagio-row.status-cancelado { border-left: 3px solid #dc3545; }
+
+.horas-badge {
+    font-weight: bold;
+    color: #333;
+}
+</style>
+{% endblock %}

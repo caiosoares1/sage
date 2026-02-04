@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+
+{% block title %}Cadastrar Usuário - Sistema de Gestão de Estágios{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h2><i class="fas fa-user-plus"></i> Cadastrar Novo Usuário</h2>
+        <p class="subtitle">Preencha os campos obrigatórios para cadastrar um novo usuário</p>
+    </div>
+
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-user"></i> Dados do Usuário</h3>
+        </div>
+        <div class="card-body">
+            <form method="post" novalidate>
+                {% csrf_token %}
+                
+                <div class="form-section">
+                    <h4>Informações Pessoais</h4>
+                    
+                    <div class="form-row">
+                        <div class="form-group col-6">
+                            <label for="id_first_name" class="required">Nome</label>
+                            {{ form.first_name }}
+                            {% if form.first_name.errors %}
+                            <small class="error-text">{{ form.first_name.errors.0 }}</small>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="form-group col-6">
+                            <label for="id_last_name">Sobrenome</label>
+                            {{ form.last_name }}
+                            {% if form.last_name.errors %}
+                            <small class="error-text">{{ form.last_name.errors.0 }}</small>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="id_email" class="required">Email</label>
+                        {{ form.email }}
+                        {% if form.email.errors %}
+                        <small class="error-text">{{ form.email.errors.0 }}</small>
+                        {% endif %}
+                        <small class="help-text">O email será usado como nome de usuário para login</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="id_password" class="required">Senha</label>
+                        {{ form.password }}
+                        {% if form.password.errors %}
+                        <small class="error-text">{{ form.password.errors.0 }}</small>
+                        {% endif %}
+                        <small class="help-text">Mínimo de 6 caracteres</small>
+                    </div>
+                </div>
+                
+                <div class="form-section">
+                    <h4>Perfil de Acesso</h4>
+                    
+                    <div class="form-group">
+                        <label for="id_tipo" class="required">Tipo de Usuário</label>
+                        {{ form.tipo }}
+                        {% if form.tipo.errors %}
+                        <small class="error-text">{{ form.tipo.errors.0 }}</small>
+                        {% endif %}
+                        <small class="help-text">Define o perfil de acesso inicial do usuário</small>
+                    </div>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Cadastrar Usuário
+                    </button>
+                    <a href="{% url 'users:listar_usuarios' %}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Cancelar
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

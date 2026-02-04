@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+
+{% block title %}Supervisores Cadastrados - Sistema de Gestão de Estágios{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h2><i class="fas fa-user-tie"></i> Supervisores Cadastrados</h2>
+        <a href="{% url 'cadastrar_supervisor' %}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Novo Supervisor
+        </a>
+    </div>
+
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Filtros -->
+    <div class="card filtros-card">
+        <div class="card-body">
+            <form method="get" class="filtros-form">
+                <div class="form-row">
+                    <div class="form-group col-5">
+                        <label for="nome">Nome</label>
+                        <input type="text" name="nome" id="nome" class="form-control" 
+                               value="{{ filtro_nome }}" placeholder="Buscar por nome...">
+                    </div>
+                    <div class="form-group col-4">
+                        <label for="empresa">Empresa</label>
+                        <input type="text" name="empresa" id="empresa" class="form-control" 
+                               value="{{ filtro_empresa }}" placeholder="Buscar por empresa...">
+                    </div>
+                    <div class="form-group col-3 align-self-end">
+                        <button type="submit" class="btn btn-secondary btn-block">
+                            <i class="fas fa-search"></i> Filtrar
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Lista de Supervisores -->
+    <div class="card">
+        <div class="card-body">
+            {% if supervisores %}
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Cargo</th>
+                            <th>Empresa</th>
+                            <th>Contato</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for supervisor in supervisores %}
+                        <tr>
+                            <td>
+                                <strong>{{ supervisor.nome }}</strong>
+                                {% if supervisor.usuario.email %}
+                                <br><small class="text-muted">{{ supervisor.usuario.email }}</small>
+                                {% endif %}
+                            </td>
+                            <td>{{ supervisor.cargo }}</td>
+                            <td>
+                                <a href="{% url 'visualizar_empresa' supervisor.empresa.id %}">
+                                    {{ supervisor.empresa.razao_social }}
+                                </a>
+                            </td>
+                            <td>{{ supervisor.contato|default:"-" }}</td>
+                            <td class="actions">
+                                <a href="{% url 'visualizar_supervisor' supervisor.id %}" class="btn btn-sm btn-info" title="Visualizar">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <a href="{% url 'editar_supervisor' supervisor.id %}" class="btn btn-sm btn-warning" title="Editar">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-user-tie fa-3x"></i>
+                <h3>Nenhum supervisor cadastrado</h3>
+                <p>Clique no botão "Novo Supervisor" para cadastrar o primeiro supervisor.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

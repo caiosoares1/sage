@@ -1,0 +1,133 @@
+{% extends 'base.html' %}
+
+{% block title %}Usuários Cadastrados - Sistema de Gestão de Estágios{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h2><i class="fas fa-users"></i> Usuários Cadastrados</h2>
+        <a href="{% url 'users:cadastrar_usuario' %}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Novo Usuário
+        </a>
+    </div>
+
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Filtros -->
+    <div class="card filtros-card">
+        <div class="card-body">
+            <form method="get" class="filtros-form">
+                <div class="form-row">
+                    <div class="form-group col-3">
+                        <label for="nome">Nome</label>
+                        <input type="text" name="nome" id="nome" class="form-control" 
+                               value="{{ filtro_nome }}" placeholder="Buscar por nome...">
+                    </div>
+                    <div class="form-group col-3">
+                        <label for="email">Email</label>
+                        <input type="text" name="email" id="email" class="form-control" 
+                               value="{{ filtro_email }}" placeholder="Buscar por email...">
+                    </div>
+                    <div class="form-group col-3">
+                        <label for="tipo">Tipo de Perfil</label>
+                        <select name="tipo" id="tipo" class="form-control">
+                            <option value="">Todos</option>
+                            {% for value, label in tipos_usuario %}
+                            <option value="{{ value }}" {% if filtro_tipo == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group col-3 align-self-end">
+                        <button type="submit" class="btn btn-secondary btn-block">
+                            <i class="fas fa-search"></i> Filtrar
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Lista de Usuários -->
+    <div class="card">
+        <div class="card-body">
+            {% if usuarios %}
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Email</th>
+                            <th>Tipo</th>
+                            <th>Nível de Acesso</th>
+                            <th>Status</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for usuario in usuarios %}
+                        <tr>
+                            <td>
+                                <strong>{{ usuario.first_name }} {{ usuario.last_name }}</strong>
+                                <br><small class="text-muted">@{{ usuario.username }}</small>
+                            </td>
+                            <td>{{ usuario.email }}</td>
+                            <td>
+                                <span class="badge badge-tipo-{{ usuario.tipo }}">
+                                    {{ usuario.get_tipo_display }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if usuario.nivel_acesso %}
+                                <span class="badge badge-info">{{ usuario.nivel_acesso.nome }}</span>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if usuario.is_active %}
+                                <span class="badge badge-success">Ativo</span>
+                                {% else %}
+                                <span class="badge badge-secondary">Inativo</span>
+                                {% endif %}
+                            </td>
+                            <td class="actions">
+                                <a href="{% url 'users:visualizar_usuario' usuario.id %}" class="btn btn-sm btn-info" title="Visualizar">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <a href="{% url 'users:editar_usuario' usuario.id %}" class="btn btn-sm btn-warning" title="Editar">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <a href="{% url 'users:atribuir_nivel_acesso' usuario.id %}" class="btn btn-sm btn-primary" title="Atribuir Nível">
+                                    <i class="fas fa-key"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-users fa-3x"></i>
+                <h3>Nenhum usuário encontrado</h3>
+                <p>Nenhum usuário corresponde aos filtros aplicados.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+.badge-tipo-aluno { background: #17a2b8; color: white; }
+.badge-tipo-supervisor { background: #28a745; color: white; }
+.badge-tipo-coordenador { background: #6f42c1; color: white; }
+</style>
+{% endblock %}

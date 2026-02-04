@@ -2681,3 +2681,470 @@ def validar_periodo_relatorio(data_inicio, data_fim):
         return (False, 'A data fim não pode ser uma data futura.')
     
     return (True, None)
+
+
+# ==================== VIEWS DE VAGAS DISPONÍVEIS ====================
+# Sprint 03 - TASK 22173 e 22174
+
+
+@login_required
+def listar_vagas_disponiveis(request):
+    """
+    View para listar vagas disponíveis para vínculo.
+    TASK 22173 - [FRONT] Criar listagem de vagas disponíveis para vínculo
+    
+    CA4 - Somente vagas aprovadas e disponíveis devem aparecer
+    """
+    # Buscar vagas aprovadas e disponíveis
+    vagas = Estagio.objects.filter(
+        status='aprovado',
+        status_vaga='disponivel'
+    ).select_related('empresa', 'supervisor').order_by('-data_inicio')
+    
+    # Filtros
+    filtro_empresa = request.GET.get('empresa', '')
+    if filtro_empresa:
+        vagas = vagas.filter(empresa__razao_social__icontains=filtro_empresa)
+    
+    filtro_cargo = request.GET.get('cargo', '')
+    if filtro_cargo:
+        vagas = vagas.filter(cargo__icontains=filtro_cargo)
+    
+    context = {
+        'vagas': vagas,
+        'filtro_empresa': filtro_empresa,
+        'filtro_cargo': filtro_cargo,
+    }
+    return render(request, 'estagio/listar_vagas_disponiveis.html', context)
+
+
+@login_required
+def detalhe_vaga(request, estagio_id):
+    """
+    View para visualizar detalhes de uma vaga disponível.
+    TASK 22173 - Parte do fluxo de listagem de vagas
+    """
+    vaga = get_object_or_404(Estagio, id=estagio_id)
+    
+    context = {
+        'vaga': vaga,
+    }
+    return render(request, 'estagio/detalhe_vaga.html', context)
+
+
+@login_required
+@require_POST
+def vincular_aluno_vaga(request, estagio_id):
+    """
+    View para vincular um aluno a uma vaga disponível.
+    TASK 22174 - [FRONT] Implementar ação de vincular aluno à vaga
+    
+    CA7 - Atualiza status da vaga para ocupada
+    CA8 - Registra histórico do vínculo
+    """
+    from estagio.models import VinculoHistorico
+    
+    vaga = get_object_or_404(Estagio, id=estagio_id)
+    
+    # Verificar se a vaga está disponível
+    if not vaga.is_disponivel():
+        messages.error(request, 'Esta vaga não está mais disponível para vínculo.')
+        return redirect('listar_vagas_disponiveis')
+    
+    # Obter o aluno selecionado
+    aluno_id = request.POST.get('aluno_id')
+    if not aluno_id:
+        messages.error(request, 'Selecione um aluno para vincular.')
+        return redirect('detalhe_vaga', estagio_id=estagio_id)
+    
+    aluno = get_object_or_404(Aluno, id=aluno_id)
+    
+    # Verificar se o aluno já está vinculado a outro estágio
+    if aluno.estagio:
+        messages.error(request, f'O aluno {aluno.nome} já está vinculado a outro estágio.')
+        return redirect('detalhe_vaga', estagio_id=estagio_id)
+    
+    try:
+        # Realiza o vínculo
+        usuario = Usuario.objects.get(id=request.user.id)
+        vaga.vincular_aluno(aluno, realizado_por=usuario)
+        
+        messages.success(
+            request, 
+            f'Aluno {aluno.nome} vinculado com sucesso à vaga "{vaga.titulo}"!'
+        )
+        return redirect('listar_vagas_disponiveis')
+        
+    except Exception as e:
+        logger.error(f"Erro ao vincular aluno: {e}")
+        messages.error(request, 'Ocorreu um erro ao vincular o aluno. Tente novamente.')
+        return redirect('detalhe_vaga', estagio_id=estagio_id)
+
+
+@login_required
+def selecionar_aluno_vaga(request, estagio_id):
+    """
+    View para selecionar aluno para vincular a uma vaga.
+    TASK 22174 - Interface de seleção de aluno
+    """
+    vaga = get_object_or_404(Estagio, id=estagio_id)
+    
+    # Verificar se a vaga está disponível
+    if not vaga.is_disponivel():
+        messages.error(request, 'Esta vaga não está mais disponível para vínculo.')
+        return redirect('listar_vagas_disponiveis')
+    
+    # Buscar alunos sem vínculo
+    alunos_disponiveis = Aluno.objects.filter(estagio__isnull=True).order_by('nome')
+    
+    # Filtro por nome
+    filtro_nome = request.GET.get('nome', '')
+    if filtro_nome:
+        alunos_disponiveis = alunos_disponiveis.filter(nome__icontains=filtro_nome)
+    
+    context = {
+        'vaga': vaga,
+        'alunos': alunos_disponiveis,
+        'filtro_nome': filtro_nome,
+    }
+    return render(request, 'estagio/selecionar_aluno_vaga.html', context)
+
+
+# ==================== VIEWS DE ATIVIDADES ====================
+# Sprint 03 - TASK 22180, 22181, 22182
+
+
+@login_required
+@supervisor_required
+def listar_atividades_pendentes(request):
+    """
+    View para listar atividades pendentes de confirmação.
+    TASK 22180 - [FRONT] Criar listagem de atividades pendentes de confirmação
+    
+    CA1 - Lista todas as atividades pendentes para o supervisor
+    """
+    from estagio.models import Atividade
+    
+    usuario = Usuario.objects.get(id=request.user.id)
+    supervisor = Supervisor.objects.get(usuario=usuario)
+    
+    # Buscar atividades pendentes dos estágios supervisionados
+    atividades = Atividade.objects.filter(
+        estagio__supervisor=supervisor,
+        status='pendente'
+    ).select_related('aluno', 'estagio').order_by('-data_realizacao')
+    
+    # Filtro por aluno
+    filtro_aluno = request.GET.get('aluno', '')
+    if filtro_aluno:
+        atividades = atividades.filter(aluno__nome__icontains=filtro_aluno)
+    
+    # Estatísticas
+    total_pendentes = atividades.count()
+    total_confirmadas = Atividade.objects.filter(
+        estagio__supervisor=supervisor,
+        status='confirmada'
+    ).count()
+    total_rejeitadas = Atividade.objects.filter(
+        estagio__supervisor=supervisor,
+        status='rejeitada'
+    ).count()
+    
+    context = {
+        'atividades': atividades,
+        'filtro_aluno': filtro_aluno,
+        'total_pendentes': total_pendentes,
+        'total_confirmadas': total_confirmadas,
+        'total_rejeitadas': total_rejeitadas,
+    }
+    return render(request, 'estagio/listar_atividades_pendentes.html', context)
+
+
+@login_required
+@supervisor_required
+def detalhe_atividade(request, atividade_id):
+    """
+    View para visualizar detalhes de uma atividade.
+    """
+    from estagio.models import Atividade
+    
+    atividade = get_object_or_404(
+        Atividade.objects.select_related('aluno', 'estagio', 'confirmado_por'),
+        id=atividade_id
+    )
+    
+    # Buscar histórico
+    historico = atividade.historico.all().order_by('-data_hora')
+    
+    context = {
+        'atividade': atividade,
+        'historico': historico,
+    }
+    return render(request, 'estagio/detalhe_atividade.html', context)
+
+
+@login_required
+@supervisor_required
+@require_POST
+def confirmar_atividade(request, atividade_id):
+    """
+    View para confirmar uma atividade realizada.
+    TASK 22181 - [FRONT] Implementar ação de confirmar atividade realizada
+    
+    CA2 - Confirmação da atividade pelo supervisor
+    CA5 - Registro no histórico
+    """
+    from estagio.models import Atividade
+    
+    atividade = get_object_or_404(Atividade, id=atividade_id)
+    
+    # Verificar se a atividade está pendente
+    if atividade.status != 'pendente':
+        messages.error(request, 'Esta atividade já foi processada.')
+        return redirect('listar_atividades_pendentes')
+    
+    try:
+        usuario = Usuario.objects.get(id=request.user.id)
+        supervisor = Supervisor.objects.get(usuario=usuario)
+        
+        # Confirmar atividade
+        atividade.confirmar(supervisor)
+        
+        messages.success(
+            request,
+            f'Atividade "{atividade.titulo}" confirmada com sucesso!'
+        )
+    except Exception as e:
+        logger.error(f"Erro ao confirmar atividade: {e}")
+        messages.error(request, 'Ocorreu um erro ao confirmar a atividade.')
+    
+    return redirect('listar_atividades_pendentes')
+
+
+@login_required
+@supervisor_required
+@require_POST
+def rejeitar_atividade(request, atividade_id):
+    """
+    View para rejeitar uma atividade com justificativa.
+    TASK 22182 - [FRONT] Implementar ação de rejeitar atividade com justificativa
+    
+    CA3 - Rejeição com justificativa obrigatória
+    CA5 - Registro no histórico
+    """
+    from estagio.models import Atividade
+    
+    atividade = get_object_or_404(Atividade, id=atividade_id)
+    
+    # Verificar se a atividade está pendente
+    if atividade.status != 'pendente':
+        messages.error(request, 'Esta atividade já foi processada.')
+        return redirect('listar_atividades_pendentes')
+    
+    # Obter justificativa
+    justificativa = request.POST.get('justificativa', '').strip()
+    
+    if not justificativa:
+        messages.error(request, 'A justificativa é obrigatória para rejeitar uma atividade.')
+        return redirect('detalhe_atividade', atividade_id=atividade_id)
+    
+    if len(justificativa) < 10:
+        messages.error(request, 'A justificativa deve ter pelo menos 10 caracteres.')
+        return redirect('detalhe_atividade', atividade_id=atividade_id)
+    
+    try:
+        usuario = Usuario.objects.get(id=request.user.id)
+        supervisor = Supervisor.objects.get(usuario=usuario)
+        
+        # Rejeitar atividade
+        atividade.rejeitar(supervisor, justificativa)
+        
+        messages.success(
+            request,
+            f'Atividade "{atividade.titulo}" rejeitada com justificativa.'
+        )
+    except Exception as e:
+        logger.error(f"Erro ao rejeitar atividade: {e}")
+        messages.error(request, 'Ocorreu um erro ao rejeitar a atividade.')
+    
+    return redirect('listar_atividades_pendentes')
+
+
+# ==================== VIEWS DE AVALIAÇÃO ====================
+# Sprint 03 - TASK 22186, 22191, 22193
+
+
+@login_required
+@supervisor_required
+def formulario_avaliacao(request, estagio_id):
+    """
+    View para criar/editar formulário de avaliação com critérios definidos.
+    TASK 22186 - [FRONT] Criar formulário de avaliação com critérios definidos
+    
+    CA1 - Avaliação com critérios previamente definidos
+    CA2 - Salvamento associado ao período correto
+    """
+    from estagio.models import Avaliacao, CriterioAvaliacao, NotaCriterio
+    
+    estagio = get_object_or_404(Estagio, id=estagio_id)
+    
+    usuario = Usuario.objects.get(id=request.user.id)
+    supervisor = Supervisor.objects.get(usuario=usuario)
+    
+    # Verificar se o supervisor é responsável pelo estágio
+    if estagio.supervisor != supervisor:
+        messages.error(request, 'Você não tem permissão para avaliar este estágio.')
+        return redirect('supervisor:documentos')
+    
+    # Buscar aluno do estágio
+    aluno = Aluno.objects.filter(estagio=estagio).first()
+    
+    # Buscar critérios ativos
+    criterios = CriterioAvaliacao.objects.filter(ativo=True).order_by('ordem', 'nome')
+    
+    if request.method == 'POST':
+        # Processar dados do formulário
+        periodo = request.POST.get('periodo', 'mensal')
+        periodo_inicio = request.POST.get('periodo_inicio')
+        periodo_fim = request.POST.get('periodo_fim')
+        
+        try:
+            from django.utils.dateparse import parse_date
+            
+            periodo_inicio_date = parse_date(periodo_inicio)
+            periodo_fim_date = parse_date(periodo_fim)
+            
+            if not periodo_inicio_date or not periodo_fim_date:
+                raise ValueError("Datas inválidas")
+            
+            if periodo_fim_date < periodo_inicio_date:
+                messages.error(request, 'A data fim deve ser posterior à data início.')
+                raise ValueError("Período inválido")
+            
+            # Criar avaliação
+            avaliacao = Avaliacao.objects.create(
+                supervisor=supervisor,
+                estagio=estagio,
+                aluno=aluno,
+                periodo=periodo,
+                periodo_inicio=periodo_inicio_date,
+                periodo_fim=periodo_fim_date,
+                data_avaliacao=timezone.now().date(),
+                status='rascunho'
+            )
+            
+            # Processar notas dos critérios
+            for criterio in criterios:
+                nota_valor = request.POST.get(f'criterio_{criterio.id}')
+                observacao = request.POST.get(f'obs_{criterio.id}', '')
+                
+                if nota_valor:
+                    try:
+                        nota_float = float(nota_valor)
+                        NotaCriterio.objects.create(
+                            avaliacao=avaliacao,
+                            criterio=criterio,
+                            nota=nota_float,
+                            observacao=observacao
+                        )
+                    except (ValueError, TypeError):
+                        pass
+            
+            # Verificar se está completa e atualizar status
+            if avaliacao.is_completa():
+                avaliacao.status = 'completa'
+                avaliacao.nota = avaliacao.calcular_nota_media()
+                avaliacao.save()
+            
+            messages.success(request, 'Avaliação salva com sucesso!')
+            return redirect('emitir_parecer', avaliacao_id=avaliacao.id)
+            
+        except Exception as e:
+            logger.error(f"Erro ao salvar avaliação: {e}")
+            messages.error(request, f'Erro ao salvar avaliação: {str(e)}')
+    
+    context = {
+        'estagio': estagio,
+        'aluno': aluno,
+        'criterios': criterios,
+    }
+    return render(request, 'estagio/formulario_avaliacao.html', context)
+
+
+@login_required
+@supervisor_required
+def emitir_parecer(request, avaliacao_id):
+    """
+    View para emitir parecer final com campo obrigatório.
+    TASK 22191 - [FRONT] Criar campo obrigatório para parecer textual
+    
+    CA4 - Geração automática da nota final
+    CA5 - Parecer textual obrigatório
+    """
+    from estagio.models import Avaliacao
+    
+    avaliacao = get_object_or_404(
+        Avaliacao.objects.select_related('estagio', 'aluno', 'supervisor'),
+        id=avaliacao_id
+    )
+    
+    usuario = Usuario.objects.get(id=request.user.id)
+    supervisor = Supervisor.objects.get(usuario=usuario)
+    
+    # Verificar permissão
+    if avaliacao.supervisor != supervisor:
+        messages.error(request, 'Você não tem permissão para emitir parecer desta avaliação.')
+        return redirect('supervisor:documentos')
+    
+    # Buscar notas dos critérios
+    notas_criterios = avaliacao.notas_criterios.select_related('criterio').all()
+    
+    if request.method == 'POST':
+        parecer_texto = request.POST.get('parecer_final', '').strip()
+        disponibilizar = request.POST.get('disponibilizar_consulta') == 'on'
+        
+        try:
+            # Emitir parecer (validação e cálculo de nota são feitos no model)
+            nota_final, parecer_final = avaliacao.emitir_parecer_final(
+                parecer_texto, 
+                disponibilizar_consulta=disponibilizar
+            )
+            
+            messages.success(
+                request,
+                f'Parecer emitido com sucesso! Nota final: {nota_final:.2f}'
+            )
+            return redirect('visualizar_avaliacao', avaliacao_id=avaliacao.id)
+            
+        except ValueError as e:
+            messages.error(request, str(e))
+    
+    context = {
+        'avaliacao': avaliacao,
+        'notas_criterios': notas_criterios,
+        'nota_calculada': avaliacao.calcular_nota_media(),
+    }
+    return render(request, 'estagio/emitir_parecer.html', context)
+
+
+@login_required
+@supervisor_required
+def visualizar_avaliacao(request, avaliacao_id):
+    """
+    View para visualizar avaliação completa.
+    """
+    from estagio.models import Avaliacao
+    
+    avaliacao = get_object_or_404(
+        Avaliacao.objects.select_related('estagio', 'aluno', 'supervisor'),
+        id=avaliacao_id
+    )
+    
+    notas_criterios = avaliacao.notas_criterios.select_related('criterio').all()
+    
+    context = {
+        'avaliacao': avaliacao,
+        'notas_criterios': notas_criterios,
+    }
+    return render(request, 'estagio/visualizar_avaliacao.html', context)
+

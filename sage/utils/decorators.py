@@ -3,6 +3,27 @@ from django.contrib import messages
 from functools import wraps
 
 
+def admin_required(view_func):
+    """Decorator para garantir que apenas administradores possam acessar a view"""
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect('login')
+        
+        # Verifica se o usuário é administrador
+        is_admin = (
+            request.user.is_superuser or 
+            getattr(request.user, 'tipo', None) == 'admin'
+        )
+        
+        if not is_admin:
+            messages.error(request, 'Acesso negado. Esta área é restrita a administradores.')
+            return redirect('dashboard')
+        
+        return view_func(request, *args, **kwargs)
+    return wrapper
+
+
 def supervisor_required(view_func):
     """Decorator para garantir que apenas supervisores possam acessar a view"""
     @wraps(view_func)

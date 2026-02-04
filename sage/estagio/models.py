@@ -155,8 +155,16 @@ class Avaliacao(models.Model):
         choices=PERIODO_CHOICES,
         default='mensal'
     )
-    periodo_inicio = models.DateField(help_text='Data de início do período avaliado')
-    periodo_fim = models.DateField(help_text='Data de fim do período avaliado')
+    periodo_inicio = models.DateField(
+        null=True,
+        blank=True,
+        help_text='Data de início do período avaliado'
+    )
+    periodo_fim = models.DateField(
+        null=True,
+        blank=True,
+        help_text='Data de fim do período avaliado'
+    )
     
     # Status da avaliação
     status = models.CharField(

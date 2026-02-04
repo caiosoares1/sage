@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+
+{% block title %}Editar {{ empresa.razao_social }} - Sistema de Gestão de Estágios{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h2><i class="fas fa-building"></i> Editar Empresa</h2>
+        <p class="subtitle">Atualize os dados da empresa {{ empresa.razao_social }}</p>
+    </div>
+
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-edit"></i> Dados da Empresa</h3>
+        </div>
+        <div class="card-body">
+            <form method="post" novalidate>
+                {% csrf_token %}
+                
+                <div class="form-section">
+                    <h4>Identificação</h4>
+                    
+                    <div class="form-group">
+                        <label>CNPJ</label>
+                        <input type="text" class="form-control" value="{{ empresa.cnpj }}" disabled readonly>
+                        <small class="help-text">O CNPJ não pode ser alterado</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="id_razao_social" class="required">Razão Social</label>
+                        {{ form.razao_social }}
+                        {% if form.razao_social.errors %}
+                        <small class="error-text">{{ form.razao_social.errors.0 }}</small>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="form-section">
+                    <h4>Endereço</h4>
+                    
+                    <div class="form-row">
+                        <div class="form-group col-8">
+                            <label for="id_rua" class="required">Rua</label>
+                            {{ form.rua }}
+                            {% if form.rua.errors %}
+                            <small class="error-text">{{ form.rua.errors.0 }}</small>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="form-group col-4">
+                            <label for="id_numero" class="required">Número</label>
+                            {{ form.numero }}
+                            {% if form.numero.errors %}
+                            <small class="error-text">{{ form.numero.errors.0 }}</small>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="id_bairro" class="required">Bairro</label>
+                        {{ form.bairro }}
+                        {% if form.bairro.errors %}
+                        <small class="error-text">{{ form.bairro.errors.0 }}</small>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Salvar Alterações
+                    </button>
+                    <a href="{% url 'visualizar_empresa' empresa.id %}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Cancelar
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+
+{% block title %}Selecionar Aluno - {{ vaga.titulo }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h2><i class="fas fa-user-plus"></i> Selecionar Aluno para Vínculo</h2>
+        <p class="subtitle">Vaga: {{ vaga.titulo }} - {{ vaga.empresa.razao_social }}</p>
+    </div>
+
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Filtro -->
+    <div class="card filtros-card">
+        <div class="card-body">
+            <form method="get" class="filtros-form">
+                <div class="form-row">
+                    <div class="form-group col-9">
+                        <label for="nome">Buscar por Nome</label>
+                        <input type="text" name="nome" id="nome" class="form-control" 
+                               value="{{ filtro_nome }}" placeholder="Digite o nome do aluno...">
+                    </div>
+                    <div class="form-group col-3 align-self-end">
+                        <button type="submit" class="btn btn-secondary btn-block">
+                            <i class="fas fa-search"></i> Buscar
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Lista de Alunos -->
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-users"></i> Alunos Disponíveis</h3>
+        </div>
+        <div class="card-body">
+            {% if alunos %}
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Matrícula</th>
+                            <th>Instituição</th>
+                            <th>Contato</th>
+                            <th>Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for aluno in alunos %}
+                        <tr>
+                            <td><strong>{{ aluno.nome }}</strong></td>
+                            <td>{{ aluno.matricula }}</td>
+                            <td>{{ aluno.instituicao.nome }}</td>
+                            <td>{{ aluno.contato|default:"-" }}</td>
+                            <td>
+                                <form method="post" action="{% url 'vincular_aluno_vaga' vaga.id %}" 
+                                      onsubmit="return confirm('Confirma o vínculo do aluno {{ aluno.nome }} à vaga {{ vaga.titulo }}?');">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="aluno_id" value="{{ aluno.id }}">
+                                    <button type="submit" class="btn btn-primary btn-sm">
+                                        <i class="fas fa-link"></i> Vincular
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-users fa-3x"></i>
+                <h3>Nenhum aluno disponível</h3>
+                <p>Não há alunos sem vínculo de estágio no momento.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="mt-3">
+        <a href="{% url 'detalhe_vaga' vaga.id %}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Voltar
+        </a>
+    </div>
+</div>
+{% endblock %}

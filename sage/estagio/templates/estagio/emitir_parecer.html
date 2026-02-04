@@ -1,0 +1,261 @@
+{% extends 'base.html' %}
+
+{% block title %}Emitir Parecer - Avaliação{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h2><i class="fas fa-file-signature"></i> Emitir Parecer Final</h2>
+        <p class="subtitle">O parecer textual é obrigatório para finalizar a avaliação</p>
+    </div>
+
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <div class="col-8">
+            <!-- Resumo da Avaliação -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3><i class="fas fa-chart-bar"></i> Resumo da Avaliação</h3>
+                </div>
+                <div class="card-body">
+                    <div class="resumo-info">
+                        <div class="resumo-item">
+                            <span class="label">Aluno</span>
+                            <span class="value">{{ avaliacao.aluno.nome|default:"Não vinculado" }}</span>
+                        </div>
+                        <div class="resumo-item">
+                            <span class="label">Estágio</span>
+                            <span class="value">{{ avaliacao.estagio.titulo }}</span>
+                        </div>
+                        <div class="resumo-item">
+                            <span class="label">Período</span>
+                            <span class="value">
+                                {{ avaliacao.get_periodo_display }} 
+                                ({{ avaliacao.periodo_inicio|date:"d/m/Y" }} a {{ avaliacao.periodo_fim|date:"d/m/Y" }})
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <h4>Notas por Critério</h4>
+                    <div class="criterios-resumo">
+                        {% for nc in notas_criterios %}
+                        <div class="criterio-nota">
+                            <span class="criterio-nome">{{ nc.criterio.nome }}</span>
+                            <span class="criterio-valor">{{ nc.nota|floatformat:1 }}</span>
+                            <div class="criterio-bar">
+                                <div class="criterio-fill" style="width: {{ nc.nota|floatformat:0 }}0%;"></div>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <p class="text-muted">Nenhuma nota registrada.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Formulário de Parecer -->
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-pen"></i> Parecer Final</h3>
+                </div>
+                <div class="card-body">
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+                        
+                        <div class="form-group">
+                            <label for="parecer_final" class="required">Parecer Textual</label>
+                            <textarea name="parecer_final" id="parecer_final" 
+                                      class="form-control" rows="8" required
+                                      minlength="50"
+                                      placeholder="Digite o parecer final sobre o desempenho do estagiário. Este campo é obrigatório e deve ter pelo menos 50 caracteres...">{{ avaliacao.parecer_final|default:"" }}</textarea>
+                            <small class="help-text">
+                                Mínimo de 50 caracteres. 
+                                <span id="char-count">0</span> caracteres digitados.
+                            </small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <div class="form-check">
+                                <input type="checkbox" name="disponibilizar_consulta" 
+                                       id="disponibilizar_consulta" class="form-check-input" checked>
+                                <label for="disponibilizar_consulta" class="form-check-label">
+                                    <i class="fas fa-eye"></i> Disponibilizar parecer para consulta do aluno
+                                </label>
+                            </div>
+                            <small class="help-text">
+                                Se marcado, o aluno poderá visualizar o parecer e a nota final.
+                            </small>
+                        </div>
+                        
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-check-circle"></i> Emitir Parecer Final
+                            </button>
+                            <a href="{% url 'supervisor:documentos' %}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Cancelar
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-4">
+            <!-- Card de Nota Final -->
+            <div class="card nota-final-card">
+                <div class="card-header">
+                    <h3><i class="fas fa-star"></i> Nota Final Calculada</h3>
+                </div>
+                <div class="card-body text-center">
+                    <div class="nota-display">
+                        {% if nota_calculada %}
+                        <span class="nota-valor">{{ nota_calculada|floatformat:2 }}</span>
+                        {% else %}
+                        <span class="nota-valor text-muted">-</span>
+                        {% endif %}
+                    </div>
+                    <p class="nota-legenda">
+                        Média ponderada dos critérios
+                    </p>
+                </div>
+            </div>
+
+            <!-- Informações -->
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h3><i class="fas fa-info-circle"></i> Informações</h3>
+                </div>
+                <div class="card-body">
+                    <ul class="info-list">
+                        <li>
+                            <i class="fas fa-check text-success"></i>
+                            A nota final é calculada automaticamente
+                        </li>
+                        <li>
+                            <i class="fas fa-check text-success"></i>
+                            O parecer textual é obrigatório
+                        </li>
+                        <li>
+                            <i class="fas fa-check text-success"></i>
+                            Após emitir, o parecer ficará disponível para consulta
+                        </li>
+                        <li>
+                            <i class="fas fa-exclamation-triangle text-warning"></i>
+                            Esta ação não pode ser desfeita
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.resumo-info {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.resumo-item {
+    display: flex;
+    gap: 10px;
+}
+
+.resumo-item .label {
+    font-weight: bold;
+    min-width: 100px;
+}
+
+.criterios-resumo {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.criterio-nota {
+    display: grid;
+    grid-template-columns: 1fr auto 100px;
+    align-items: center;
+    gap: 15px;
+}
+
+.criterio-nome {
+    font-weight: 500;
+}
+
+.criterio-valor {
+    font-weight: bold;
+    font-size: 1.1rem;
+    color: #4a6cf7;
+}
+
+.criterio-bar {
+    height: 8px;
+    background: #e0e0e0;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.criterio-fill {
+    height: 100%;
+    background: #4a6cf7;
+    border-radius: 4px;
+}
+
+.nota-final-card .nota-display {
+    padding: 20px;
+}
+
+.nota-display .nota-valor {
+    font-size: 4rem;
+    font-weight: bold;
+    color: #4a6cf7;
+}
+
+.nota-legenda {
+    color: #666;
+    margin-top: 10px;
+}
+
+.info-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.info-list li {
+    padding: 10px 0;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+}
+
+.info-list li:last-child {
+    border-bottom: none;
+}
+
+.info-list i {
+    margin-top: 3px;
+}
+</style>
+
+<script>
+document.getElementById('parecer_final').addEventListener('input', function() {
+    document.getElementById('char-count').textContent = this.value.length;
+});
+</script>
+{% endblock %}
