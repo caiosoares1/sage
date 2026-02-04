@@ -155,8 +155,8 @@ class Avaliacao(models.Model):
         choices=PERIODO_CHOICES,
         default='mensal'
     )
-    periodo_inicio = models.DateField(help_text='Data de início do período avaliado')
-    periodo_fim = models.DateField(help_text='Data de fim do período avaliado')
+    periodo_inicio = models.DateField(help_text='Data de início do período avaliado', null=True, blank=True)
+    periodo_fim = models.DateField(help_text='Data de fim do período avaliado', null=True, blank=True)
     
     # Status da avaliação
     status = models.CharField(
@@ -191,7 +191,7 @@ class Avaliacao(models.Model):
     aluno = models.ForeignKey('Aluno', on_delete=models.CASCADE, related_name='avaliacoes', null=True, blank=True)
     
     # Campos de auditoria
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

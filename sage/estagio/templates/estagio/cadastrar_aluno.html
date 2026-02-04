@@ -132,7 +132,7 @@
                 {% endif %}
 
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-primary btn-lg">
+                    <button type="submit" id="submitBtn" class="btn btn-primary btn-lg" disabled>
                         <i class="fas fa-save"></i> {% if show_user_fields %}Criar Conta{% else %}Salvar Cadastro{% endif %}
                     </button>
                     {% if show_user_fields %}
@@ -295,6 +295,17 @@
     box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
 }
 
+.btn-primary:disabled {
+    background: linear-gradient(135deg, #9CA3AF 0%, #6B7280 100%);
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.btn-primary:disabled:hover {
+    transform: none;
+    box-shadow: none;
+}
+
 .btn-secondary {
     background-color: #F3F4F6;
     color: var(--text-gray);
@@ -349,4 +360,67 @@
     margin-bottom: 0.5rem;
 }
 </style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const submitBtn = document.getElementById('submitBtn');
+    const form = submitBtn.closest('form');
+    
+    const usernameField = document.getElementById('username');
+    const showUserFields = usernameField !== null;
+    
+    let requiredFields;
+    if (showUserFields) {
+        requiredFields = [
+            usernameField,
+            document.getElementById('password'),
+            document.getElementById('password_confirm'),
+            document.getElementById('id_nome'),
+            document.getElementById('id_contato'),
+            document.getElementById('id_matricula'),
+            document.getElementById('id_instituicao')
+        ];
+    } else {
+        requiredFields = [
+            document.getElementById('id_nome'),
+            document.getElementById('id_contato'),
+            document.getElementById('id_matricula'),
+            document.getElementById('id_instituicao')
+        ];
+    }
+    
+    requiredFields = requiredFields.filter(field => field !== null);
+    
+    function validateForm() {
+        let allFilled = true;
+        
+        for (let field of requiredFields) {
+            if (!field.value.trim()) {
+                allFilled = false;
+                break;
+            }
+        }
+        
+        if (showUserFields) {
+            const password = document.getElementById('password');
+            const passwordConfirm = document.getElementById('password_confirm');
+            
+            if (password && passwordConfirm) {
+                if (password.value !== passwordConfirm.value) {
+                    allFilled = false;
+                }
+            }
+        }
+        
+        submitBtn.disabled = !allFilled;
+    }
+    
+    requiredFields.forEach(field => {
+        field.addEventListener('input', validateForm);
+        field.addEventListener('change', validateForm);
+    });
+    
+    validateForm();
+});
+</script>
 {% endblock %}
