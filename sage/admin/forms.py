@@ -1,13 +1,253 @@
 from django import forms
 from django.core.validators import MinLengthValidator
 import re
-from .models import Empresa, Supervisor
+from .models import Empresa, Supervisor, Instituicao
 from users.models import Usuario
 
+
+# ==================== FORMULÁRIOS DE INSTITUIÇÃO ====================
+
+
+class InstituicaoForm(forms.ModelForm):
+    """
+    Formulário para cadastro de instituição de ensino.
+    Campos obrigatórios: Nome, Contato, Endereço completo
+    """
+    
+    class Meta:
+        model = Instituicao
+        fields = ['nome', 'contato', 'rua', 'numero', 'bairro']
+        widgets = {
+            'nome': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Nome da Instituição'
+            }),
+            'contato': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': '(11) 99999-9999 ou email@instituicao.edu.br'
+            }),
+            'rua': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Nome da rua'
+            }),
+            'numero': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Número'
+            }),
+            'bairro': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Bairro'
+            }),
+        }
+        labels = {
+            'nome': 'Nome da Instituição',
+            'contato': 'Contato',
+            'rua': 'Rua',
+            'numero': 'Número',
+            'bairro': 'Bairro',
+        }
+        error_messages = {
+            'nome': {
+                'required': 'Nome da instituição é obrigatório.',
+            },
+            'contato': {
+                'required': 'Contato é obrigatório.',
+            },
+            'rua': {
+                'required': 'Rua é obrigatória.',
+            },
+            'numero': {
+                'required': 'Número é obrigatório.',
+            },
+            'bairro': {
+                'required': 'Bairro é obrigatório.',
+            },
+        }
+    
+    def clean_nome(self):
+        """Valida o nome da instituição"""
+        nome = self.cleaned_data.get('nome', '')
+        
+        if not nome or len(nome.strip()) < 3:
+            raise forms.ValidationError('Nome da instituição deve ter pelo menos 3 caracteres.')
+        
+        # Verifica duplicidade (exceto na edição do mesmo registro)
+        queryset = Instituicao.objects.filter(nome__iexact=nome.strip())
+        if self.instance.pk:
+            queryset = queryset.exclude(pk=self.instance.pk)
+        
+        if queryset.exists():
+            raise forms.ValidationError('Já existe uma instituição cadastrada com este nome.')
+        
+        return nome.strip()
+
+
+class InstituicaoEditForm(forms.ModelForm):
+    """
+    Formulário para edição de instituição.
+    """
+    
+    class Meta:
+        model = Instituicao
+        fields = ['nome', 'contato', 'rua', 'numero', 'bairro']
+        widgets = {
+            'nome': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Nome da Instituição'
+            }),
+            'contato': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': '(11) 99999-9999 ou email@instituicao.edu.br'
+            }),
+            'rua': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Nome da rua'
+            }),
+            'numero': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Número'
+            }),
+            'bairro': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Bairro'
+            }),
+        }
+        labels = {
+            'nome': 'Nome da Instituição',
+            'contato': 'Contato',
+            'rua': 'Rua',
+            'numero': 'Número',
+            'bairro': 'Bairro',
+        }
+
 # ==================== FORMULÁRIOS DE EMPRESA ====================
-# Os formulários de Empresa foram migrados para a API REST.
-# Use os serializers em admin/serializers.py para validações.
-# Endpoints disponíveis em /api/empresas/
+# Sprint 03 - TASK 22167 - Criar tela de cadastro de empresa com campos obrigatórios
+
+
+class EmpresaForm(forms.ModelForm):
+    """
+    Formulário para cadastro de empresa com campos obrigatórios.
+    TASK 22167 - [FRONT] Criar tela de cadastro de empresa com campos obrigatórios
+    
+    Campos obrigatórios: CNPJ, Razão Social, Endereço completo
+    """
+    
+    class Meta:
+        model = Empresa
+        fields = ['cnpj', 'razao_social', 'rua', 'numero', 'bairro']
+        widgets = {
+            'cnpj': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': '00.000.000/0000-00',
+                'maxlength': '18'
+            }),
+            'razao_social': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Razão Social da Empresa'
+            }),
+            'rua': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Nome da rua'
+            }),
+            'numero': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Número'
+            }),
+            'bairro': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Bairro'
+            }),
+        }
+        labels = {
+            'cnpj': 'CNPJ',
+            'razao_social': 'Razão Social',
+            'rua': 'Rua',
+            'numero': 'Número',
+            'bairro': 'Bairro',
+        }
+        error_messages = {
+            'cnpj': {
+                'required': 'CNPJ é obrigatório.',
+            },
+            'razao_social': {
+                'required': 'Razão Social é obrigatória.',
+            },
+            'rua': {
+                'required': 'Rua é obrigatória.',
+            },
+            'numero': {
+                'required': 'Número é obrigatório.',
+            },
+            'bairro': {
+                'required': 'Bairro é obrigatório.',
+            },
+        }
+    
+    def clean_cnpj(self):
+        """Valida o CNPJ (formato e unicidade)"""
+        cnpj = self.cleaned_data.get('cnpj', '')
+        
+        # Remove caracteres não numéricos para validação
+        cnpj_numeros = re.sub(r'\D', '', cnpj)
+        
+        if len(cnpj_numeros) != 14:
+            raise forms.ValidationError('CNPJ deve conter 14 dígitos.')
+        
+        # Verifica duplicidade (exceto na edição do mesmo registro)
+        queryset = Empresa.objects.filter(cnpj=cnpj_numeros)
+        if self.instance.pk:
+            queryset = queryset.exclude(pk=self.instance.pk)
+        
+        if queryset.exists():
+            raise forms.ValidationError('Já existe uma empresa cadastrada com este CNPJ.')
+        
+        return cnpj_numeros
+    
+    def clean_razao_social(self):
+        """Valida a razão social"""
+        razao_social = self.cleaned_data.get('razao_social', '')
+        
+        if not razao_social or len(razao_social.strip()) < 3:
+            raise forms.ValidationError('Razão Social deve ter pelo menos 3 caracteres.')
+        
+        return razao_social.strip()
+
+
+class EmpresaEditForm(forms.ModelForm):
+    """
+    Formulário para edição de empresa (sem alterar CNPJ).
+    """
+    
+    class Meta:
+        model = Empresa
+        fields = ['razao_social', 'rua', 'numero', 'bairro']
+        widgets = {
+            'razao_social': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Razão Social da Empresa'
+            }),
+            'rua': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Nome da rua'
+            }),
+            'numero': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Número'
+            }),
+            'bairro': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Bairro'
+            }),
+        }
+        labels = {
+            'razao_social': 'Razão Social',
+            'rua': 'Rua',
+            'numero': 'Número',
+            'bairro': 'Bairro',
+        }
+
+
+# Endpoints da API disponíveis em /api/empresas/
 
 
 class SupervisorForm(forms.ModelForm):

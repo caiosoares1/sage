@@ -1,0 +1,210 @@
+{% extends 'base.html' %}
+
+{% block title %}Formulário de Avaliação - {{ estagio.titulo }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h2><i class="fas fa-clipboard-list"></i> Formulário de Avaliação</h2>
+        <p class="subtitle">Avalie o desempenho do estagiário com base nos critérios definidos</p>
+    </div>
+
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Informações do Estágio -->
+    <div class="card mb-4">
+        <div class="card-body info-bar">
+            <div class="info-item">
+                <i class="fas fa-briefcase"></i>
+                <span><strong>Estágio:</strong> {{ estagio.titulo }}</span>
+            </div>
+            <div class="info-item">
+                <i class="fas fa-building"></i>
+                <span><strong>Empresa:</strong> {{ estagio.empresa.razao_social }}</span>
+            </div>
+            {% if aluno %}
+            <div class="info-item">
+                <i class="fas fa-user"></i>
+                <span><strong>Aluno:</strong> {{ aluno.nome }}</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <form method="post" novalidate>
+        {% csrf_token %}
+        
+        <!-- Período da Avaliação -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3><i class="fas fa-calendar"></i> Período da Avaliação</h3>
+            </div>
+            <div class="card-body">
+                <div class="form-row">
+                    <div class="form-group col-4">
+                        <label for="periodo" class="required">Tipo de Período</label>
+                        <select name="periodo" id="periodo" class="form-control" required>
+                            <option value="mensal">Mensal</option>
+                            <option value="bimestral">Bimestral</option>
+                            <option value="trimestral">Trimestral</option>
+                            <option value="semestral">Semestral</option>
+                            <option value="final">Avaliação Final</option>
+                        </select>
+                    </div>
+                    <div class="form-group col-4">
+                        <label for="periodo_inicio" class="required">Data Início</label>
+                        <input type="date" name="periodo_inicio" id="periodo_inicio" 
+                               class="form-control" required>
+                    </div>
+                    <div class="form-group col-4">
+                        <label for="periodo_fim" class="required">Data Fim</label>
+                        <input type="date" name="periodo_fim" id="periodo_fim" 
+                               class="form-control" required>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Critérios de Avaliação -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3><i class="fas fa-star"></i> Critérios de Avaliação</h3>
+                <span class="help-text">Preencha as notas de 0 a 10 para cada critério</span>
+            </div>
+            <div class="card-body">
+                {% if criterios %}
+                <div class="criterios-list">
+                    {% for criterio in criterios %}
+                    <div class="criterio-item {% if criterio.obrigatorio %}obrigatorio{% endif %}">
+                        <div class="criterio-header">
+                            <h4>
+                                {{ criterio.nome }}
+                                {% if criterio.obrigatorio %}
+                                <span class="badge badge-warning">Obrigatório</span>
+                                {% endif %}
+                            </h4>
+                            <span class="peso">Peso: {{ criterio.peso }}</span>
+                        </div>
+                        {% if criterio.descricao %}
+                        <p class="criterio-descricao">{{ criterio.descricao }}</p>
+                        {% endif %}
+                        <div class="form-row">
+                            <div class="form-group col-3">
+                                <label for="criterio_{{ criterio.id }}" {% if criterio.obrigatorio %}class="required"{% endif %}>
+                                    Nota ({{ criterio.nota_minima }} - {{ criterio.nota_maxima }})
+                                </label>
+                                <input type="number" 
+                                       name="criterio_{{ criterio.id }}" 
+                                       id="criterio_{{ criterio.id }}"
+                                       class="form-control nota-input"
+                                       min="{{ criterio.nota_minima }}" 
+                                       max="{{ criterio.nota_maxima }}"
+                                       step="0.5"
+                                       {% if criterio.obrigatorio %}required{% endif %}>
+                            </div>
+                            <div class="form-group col-9">
+                                <label for="obs_{{ criterio.id }}">Observação</label>
+                                <input type="text" 
+                                       name="obs_{{ criterio.id }}" 
+                                       id="obs_{{ criterio.id }}"
+                                       class="form-control"
+                                       placeholder="Observação opcional sobre este critério...">
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    Nenhum critério de avaliação cadastrado. Entre em contato com o administrador.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary btn-lg">
+                <i class="fas fa-save"></i> Salvar e Continuar para Parecer
+            </button>
+            <a href="{% url 'supervisor:documentos' %}" class="btn btn-secondary">
+                <i class="fas fa-times"></i> Cancelar
+            </a>
+        </div>
+    </form>
+</div>
+
+<style>
+.info-bar {
+    display: flex;
+    gap: 30px;
+    flex-wrap: wrap;
+}
+
+.info-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.info-item i {
+    color: #4a6cf7;
+}
+
+.criterios-list {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.criterio-item {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 20px;
+    border-left: 4px solid #4a6cf7;
+}
+
+.criterio-item.obrigatorio {
+    border-left-color: #ffc107;
+}
+
+.criterio-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.criterio-header h4 {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.peso {
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.criterio-descricao {
+    color: #666;
+    margin-bottom: 15px;
+    font-size: 0.95rem;
+}
+
+.nota-input {
+    font-size: 1.2rem;
+    text-align: center;
+    font-weight: bold;
+}
+</style>
+{% endblock %}

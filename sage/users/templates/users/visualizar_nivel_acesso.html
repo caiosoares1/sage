@@ -1,0 +1,160 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ nivel.nome }} - Nível de Acesso{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h2><i class="fas fa-layer-group"></i> {{ nivel.nome }}</h2>
+        <div class="header-actions">
+            <a href="{% url 'users:editar_nivel_acesso' nivel.id %}" class="btn btn-warning">
+                <i class="fas fa-edit"></i> Editar
+            </a>
+            <a href="{% url 'users:listar_niveis_acesso' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Voltar
+            </a>
+        </div>
+    </div>
+
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <div class="col-6">
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-info-circle"></i> Informações do Nível</h3>
+                </div>
+                <div class="card-body">
+                    <div class="info-group">
+                        <label>Nome</label>
+                        <p><strong>{{ nivel.nome }}</strong></p>
+                    </div>
+                    <div class="info-group">
+                        <label>Descrição</label>
+                        <p>{{ nivel.descricao|default:"Sem descrição" }}</p>
+                    </div>
+                    <div class="info-group">
+                        <label>Status</label>
+                        <p>
+                            {% if nivel.ativo %}
+                            <span class="badge badge-success">Ativo</span>
+                            {% else %}
+                            <span class="badge badge-secondary">Inativo</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                    <div class="info-group">
+                        <label>Criado em</label>
+                        <p>{{ nivel.created_at|date:"d/m/Y H:i" }}</p>
+                    </div>
+                    <div class="info-group">
+                        <label>Última atualização</label>
+                        <p>{{ nivel.updated_at|date:"d/m/Y H:i" }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h3><i class="fas fa-key"></i> Permissões ({{ permissoes.count }})</h3>
+                </div>
+                <div class="card-body">
+                    {% if permissoes %}
+                    <div class="permissoes-list">
+                        {% for perm in permissoes %}
+                        <span class="badge badge-light">
+                            <i class="fas fa-check"></i> {{ perm.name }}
+                        </span>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted">Nenhuma permissão atribuída a este nível.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-6">
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-users"></i> Usuários com este Nível ({{ usuarios_associados.count }})</h3>
+                </div>
+                <div class="card-body">
+                    {% if usuarios_associados %}
+                    <ul class="usuarios-list">
+                        {% for usuario in usuarios_associados %}
+                        <li>
+                            <a href="{% url 'users:visualizar_usuario' usuario.id %}">
+                                <i class="fas fa-user"></i> {{ usuario.first_name }} {{ usuario.last_name }}
+                            </a>
+                            <span class="badge badge-tipo-{{ usuario.tipo }}">{{ usuario.get_tipo_display }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="text-muted">Nenhum usuário está associado a este nível de acesso.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if nivel.ativo and usuarios_associados %}
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h3><i class="fas fa-sync"></i> Ações</h3>
+                </div>
+                <div class="card-body">
+                    <form method="post" action="{% url 'users:aplicar_permissoes_nivel' nivel.id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-primary btn-block"
+                                onclick="return confirm('Aplicar permissões a todos os {{ usuarios_associados.count }} usuários?');">
+                            <i class="fas fa-sync"></i> Reaplicar Permissões aos Usuários
+                        </button>
+                    </form>
+                    <small class="help-text mt-2 d-block">
+                        Use esta ação para forçar a atualização das permissões de todos os usuários associados.
+                    </small>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+.permissoes-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.usuarios-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.usuarios-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.usuarios-list li:last-child {
+    border-bottom: none;
+}
+
+.badge-tipo-aluno { background: #17a2b8; color: white; }
+.badge-tipo-supervisor { background: #28a745; color: white; }
+.badge-tipo-coordenador { background: #6f42c1; color: white; }
+</style>
+{% endblock %}

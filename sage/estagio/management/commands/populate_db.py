@@ -23,6 +23,18 @@ class Command(BaseCommand):
         Instituicao.objects.all().delete()
         Usuario.objects.filter(is_superuser=False).delete()
 
+        # Create Admin User
+        self.stdout.write('Creating admin user...')
+        admin_user = Usuario.objects.create_user(
+            username='admin',
+            email='admin@sage.com',
+            password='admin123',
+            tipo='admin',
+            first_name='Administrador',
+            last_name='Sistema',
+            is_staff=True
+        )
+
         # Create Institutions
         self.stdout.write('Creating institutions...')
         inst1 = Instituicao.objects.create(
@@ -250,14 +262,16 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS('\n✅ Database populated successfully!\n'))
         self.stdout.write(self.style.SUCCESS('Sample credentials:'))
-        self.stdout.write(self.style.SUCCESS('  Students:'))
+        self.stdout.write(self.style.SUCCESS('  🔐 Admin (acesso total à gestão):'))
+        self.stdout.write('    - admin / admin123')
+        self.stdout.write(self.style.SUCCESS('  🎓 Students:'))
         self.stdout.write('    - caio.batista / senha123')
         self.stdout.write('    - julia.costa / senha123')
         self.stdout.write('    - pedro.alves / senha123')
-        self.stdout.write(self.style.SUCCESS('  Coordinators:'))
+        self.stdout.write(self.style.SUCCESS('  👔 Coordinators:'))
         self.stdout.write('    - prof.silva / senha123')
         self.stdout.write('    - prof.martins / senha123')
-        self.stdout.write(self.style.SUCCESS('  Supervisors:'))
+        self.stdout.write(self.style.SUCCESS('  🏢 Supervisors:'))
         self.stdout.write('    - miguel.santos / senha123')
         self.stdout.write('    - ana.oliveira / senha123')
         self.stdout.write('    - carlos.mendes / senha123')

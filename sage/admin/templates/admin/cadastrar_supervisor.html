@@ -1,0 +1,107 @@
+{% extends 'base.html' %}
+
+{% block title %}Cadastrar Supervisor - Sistema de Gestão de Estágios{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h2><i class="fas fa-user-tie"></i> Cadastrar Novo Supervisor</h2>
+        <p class="subtitle">Preencha os campos obrigatórios para cadastrar um supervisor vinculado a uma empresa</p>
+    </div>
+
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-plus-circle"></i> Dados do Supervisor</h3>
+        </div>
+        <div class="card-body">
+            <form method="post" novalidate>
+                {% csrf_token %}
+                
+                <div class="form-section">
+                    <h4>Informações Pessoais</h4>
+                    
+                    <div class="form-group">
+                        <label for="id_nome" class="required">Nome Completo</label>
+                        {{ form.nome }}
+                        {% if form.nome.errors %}
+                        <small class="error-text">{{ form.nome.errors.0 }}</small>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group col-6">
+                            <label for="id_email" class="required">Email</label>
+                            {{ form.email }}
+                            {% if form.email.errors %}
+                            <small class="error-text">{{ form.email.errors.0 }}</small>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="form-group col-6">
+                            <label for="id_contato">Telefone</label>
+                            {{ form.contato }}
+                            {% if form.contato.errors %}
+                            <small class="error-text">{{ form.contato.errors.0 }}</small>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="id_senha" class="required">Senha</label>
+                        {{ form.senha }}
+                        {% if form.senha.errors %}
+                        <small class="error-text">{{ form.senha.errors.0 }}</small>
+                        {% endif %}
+                        <small class="help-text">Mínimo 6 caracteres</small>
+                    </div>
+                </div>
+                
+                <div class="form-section">
+                    <h4>Vínculo com Empresa</h4>
+                    
+                    <div class="form-row">
+                        <div class="form-group col-6">
+                            <label for="id_empresa" class="required">Empresa</label>
+                            {{ form.empresa }}
+                            {% if form.empresa.errors %}
+                            <small class="error-text">{{ form.empresa.errors.0 }}</small>
+                            {% endif %}
+                            <small class="help-text">
+                                Não encontrou a empresa? 
+                                <a href="{% url 'cadastrar_empresa' %}">Cadastre aqui</a>
+                            </small>
+                        </div>
+                        
+                        <div class="form-group col-6">
+                            <label for="id_cargo" class="required">Cargo</label>
+                            {{ form.cargo }}
+                            {% if form.cargo.errors %}
+                            <small class="error-text">{{ form.cargo.errors.0 }}</small>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Cadastrar Supervisor
+                    </button>
+                    <a href="{% url 'listar_supervisores' %}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Cancelar
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

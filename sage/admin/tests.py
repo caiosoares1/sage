@@ -522,7 +522,7 @@ class ListarEmpresasViewTest(TestCase):
             username='admin@test.com',
             email='admin@test.com',
             password='senha123',
-            tipo='coordenador'
+            tipo='admin'
         )
         self.url = reverse('listar_empresas')
     
@@ -555,7 +555,7 @@ class ListarEmpresasViewTest(TestCase):
         
         self.assertEqual(response.status_code, 200)
         self.assertIn('empresas', response.context)
-        self.assertEqual(response.context['empresas'].count(), 2)
+        self.assertEqual(len(response.context['empresas']), 2)
     
     def test_filtrar_empresas_por_nome(self):
         """Testa filtro de empresas por razão social"""
@@ -576,11 +576,11 @@ class ListarEmpresasViewTest(TestCase):
             bairro="Jardim"
         )
         
-        response = self.client.get(self.url, {'nome': 'Tech'})
+        response = self.client.get(self.url, {'razao': 'Tech'})
         
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.context['empresas'].count(), 1)
-        self.assertEqual(response.context['empresas'].first().razao_social, "Tech Solutions")
+        self.assertEqual(len(response.context['empresas']), 1)
+        self.assertEqual(response.context['empresas'][0].razao_social, "Tech Solutions")
 
 
 class CadastrarEmpresaViewTest(TestCase):
@@ -592,7 +592,7 @@ class CadastrarEmpresaViewTest(TestCase):
             username='admin@test.com',
             email='admin@test.com',
             password='senha123',
-            tipo='coordenador'
+            tipo='admin'
         )
         self.url = reverse('cadastrar_empresa')
     
@@ -802,7 +802,7 @@ class VisualizarEmpresaViewTest(TestCase):
             username='admin@test.com',
             email='admin@test.com',
             password='senha123',
-            tipo='coordenador'
+            tipo='admin'
         )
         self.empresa = Empresa.objects.create(
             cnpj="12345678901234",
@@ -840,7 +840,7 @@ class EditarEmpresaViewTest(TestCase):
             username='admin@test.com',
             email='admin@test.com',
             password='senha123',
-            tipo='coordenador'
+            tipo='admin'
         )
         self.empresa = Empresa.objects.create(
             cnpj="12345678901234",
@@ -911,7 +911,7 @@ class ListarSupervisoresViewTest(TestCase):
             username='admin@test.com',
             email='admin@test.com',
             password='senha123',
-            tipo='coordenador'
+            tipo='admin'
         )
         self.empresa = Empresa.objects.create(
             cnpj="12345678901234",
@@ -945,7 +945,7 @@ class ListarSupervisoresViewTest(TestCase):
         
         self.assertEqual(response.status_code, 200)
         self.assertIn('supervisores', response.context)
-        self.assertEqual(response.context['supervisores'].count(), 1)
+        self.assertEqual(len(response.context['supervisores']), 1)
 
 
 class CadastrarSupervisorViewTest(TestCase):
@@ -957,7 +957,7 @@ class CadastrarSupervisorViewTest(TestCase):
             username='admin@test.com',
             email='admin@test.com',
             password='senha123',
-            tipo='coordenador'
+            tipo='admin'
         )
         self.empresa = Empresa.objects.create(
             cnpj="12345678901234",
@@ -1169,7 +1169,7 @@ class VisualizarSupervisorViewTest(TestCase):
             username='admin@test.com',
             email='admin@test.com',
             password='senha123',
-            tipo='coordenador'
+            tipo='admin'
         )
         self.empresa = Empresa.objects.create(
             cnpj="12345678901234",
@@ -1220,7 +1220,7 @@ class EditarSupervisorViewTest(TestCase):
             username='admin@test.com',
             email='admin@test.com',
             password='senha123',
-            tipo='coordenador'
+            tipo='admin'
         )
         self.empresa = Empresa.objects.create(
             cnpj="12345678901234",
@@ -1330,7 +1330,7 @@ class IntegracaoEmpresaSupervisorTest(TestCase):
             username='admin@test.com',
             email='admin@test.com',
             password='senha123',
-            tipo='coordenador'
+            tipo='admin'
         )
     
     def test_fluxo_completo_cadastro_empresa_e_supervisor(self):

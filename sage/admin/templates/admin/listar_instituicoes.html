@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+
+{% block title %}Instituições Cadastradas - Sistema de Gestão de Estágios{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h2><i class="fas fa-university"></i> Instituições de Ensino</h2>
+        <a href="{% url 'cadastrar_instituicao' %}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Nova Instituição
+        </a>
+    </div>
+
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Filtros -->
+    <div class="card filtros-card">
+        <div class="card-body">
+            <form method="get" class="filtros-form">
+                <div class="form-row">
+                    <div class="form-group col-8">
+                        <label for="nome">Nome da Instituição</label>
+                        <input type="text" name="nome" id="nome" class="form-control" 
+                               value="{{ filtro_nome }}" placeholder="Buscar por nome...">
+                    </div>
+                    <div class="form-group col-4 align-self-end">
+                        <button type="submit" class="btn btn-secondary btn-block">
+                            <i class="fas fa-search"></i> Filtrar
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Lista de Instituições -->
+    <div class="card">
+        <div class="card-body">
+            {% if instituicoes %}
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Contato</th>
+                            <th>Endereço</th>
+                            <th>Alunos</th>
+                            <th>Coordenadores</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for instituicao in instituicoes %}
+                        <tr>
+                            <td>
+                                <strong>{{ instituicao.nome }}</strong>
+                            </td>
+                            <td>{{ instituicao.contato }}</td>
+                            <td>{{ instituicao.rua }}, {{ instituicao.numero }} - {{ instituicao.bairro }}</td>
+                            <td>
+                                <span class="badge badge-info">{{ instituicao.total_alunos }}</span>
+                            </td>
+                            <td>
+                                <span class="badge badge-success">{{ instituicao.total_coordenadores }}</span>
+                            </td>
+                            <td class="actions">
+                                <a href="{% url 'visualizar_instituicao' instituicao.id %}" class="btn btn-sm btn-info" title="Visualizar">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <a href="{% url 'editar_instituicao' instituicao.id %}" class="btn btn-sm btn-warning" title="Editar">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-university fa-3x"></i>
+                <h3>Nenhuma instituição cadastrada</h3>
+                <p>Clique no botão "Nova Instituição" para cadastrar a primeira instituição.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

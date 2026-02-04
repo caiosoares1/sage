@@ -1,0 +1,283 @@
+{% extends 'base.html' %}
+
+{% block title %}Atividades Pendentes - Sistema de Gestão de Estágios{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h2><i class="fas fa-tasks"></i> Atividades Pendentes de Confirmação</h2>
+        <p class="subtitle">Gerencie as atividades dos estagiários</p>
+    </div>
+
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Estatísticas -->
+    <div class="stats-grid mb-4">
+        <div class="stat-card stat-warning">
+            <div class="stat-icon"><i class="fas fa-clock"></i></div>
+            <div class="stat-info">
+                <h3>{{ total_pendentes }}</h3>
+                <p>Pendentes</p>
+            </div>
+        </div>
+        <div class="stat-card stat-success">
+            <div class="stat-icon"><i class="fas fa-check"></i></div>
+            <div class="stat-info">
+                <h3>{{ total_confirmadas }}</h3>
+                <p>Confirmadas</p>
+            </div>
+        </div>
+        <div class="stat-card stat-danger">
+            <div class="stat-icon"><i class="fas fa-times"></i></div>
+            <div class="stat-info">
+                <h3>{{ total_rejeitadas }}</h3>
+                <p>Rejeitadas</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtro -->
+    <div class="card filtros-card">
+        <div class="card-body">
+            <form method="get" class="filtros-form">
+                <div class="form-row">
+                    <div class="form-group col-9">
+                        <label for="aluno">Filtrar por Aluno</label>
+                        <input type="text" name="aluno" id="aluno" class="form-control" 
+                               value="{{ filtro_aluno }}" placeholder="Nome do aluno...">
+                    </div>
+                    <div class="form-group col-3 align-self-end">
+                        <button type="submit" class="btn btn-secondary btn-block">
+                            <i class="fas fa-search"></i> Filtrar
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Lista de Atividades -->
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-list"></i> Atividades Aguardando Confirmação</h3>
+        </div>
+        <div class="card-body">
+            {% if atividades %}
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Atividade</th>
+                            <th>Aluno</th>
+                            <th>Estágio</th>
+                            <th>Data</th>
+                            <th>Horas</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for atividade in atividades %}
+                        <tr>
+                            <td>
+                                <strong>{{ atividade.titulo }}</strong>
+                                <br><small class="text-muted">{{ atividade.descricao|truncatewords:10 }}</small>
+                            </td>
+                            <td>{{ atividade.aluno.nome }}</td>
+                            <td>{{ atividade.estagio.titulo }}</td>
+                            <td>{{ atividade.data_realizacao|date:"d/m/Y" }}</td>
+                            <td>{{ atividade.horas_dedicadas }}h</td>
+                            <td class="actions">
+                                <a href="{% url 'detalhe_atividade' atividade.id %}" class="btn btn-sm btn-info" title="Detalhes">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <form method="post" action="{% url 'confirmar_atividade' atividade.id %}" style="display: inline;">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-success" title="Confirmar"
+                                            onclick="return confirm('Confirmar esta atividade?');">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                </form>
+                                <button type="button" class="btn btn-sm btn-danger" title="Rejeitar"
+                                        onclick="abrirModalRejeicao({{ atividade.id }}, '{{ atividade.titulo|escapejs }}')">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-check-circle fa-3x"></i>
+                <h3>Nenhuma atividade pendente</h3>
+                <p>Todas as atividades dos seus estagiários foram processadas.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Rejeição -->
+<div id="modal-rejeicao" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="fas fa-times-circle"></i> Rejeitar Atividade</h3>
+            <button type="button" onclick="fecharModal()" class="close-btn">&times;</button>
+        </div>
+        <form id="form-rejeicao" method="post" action="">
+            {% csrf_token %}
+            <div class="modal-body">
+                <p>Atividade: <strong id="atividade-titulo"></strong></p>
+                <div class="form-group">
+                    <label for="justificativa" class="required">Justificativa</label>
+                    <textarea name="justificativa" id="justificativa" class="form-control" 
+                              rows="4" required minlength="10"
+                              placeholder="Informe o motivo da rejeição (mínimo 10 caracteres)..."></textarea>
+                    <small class="help-text">A justificativa é obrigatória e será registrada no histórico.</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="fecharModal()" class="btn btn-secondary">Cancelar</button>
+                <button type="submit" class="btn btn-danger">
+                    <i class="fas fa-times"></i> Confirmar Rejeição
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+}
+
+.stat-card {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.stat-card .stat-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+}
+
+.stat-warning .stat-icon {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.stat-success .stat-icon {
+    background: #d4edda;
+    color: #155724;
+}
+
+.stat-danger .stat-icon {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.stat-info h3 {
+    margin: 0;
+    font-size: 1.8rem;
+}
+
+.stat-info p {
+    margin: 0;
+    color: #666;
+}
+
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 8px;
+    width: 100%;
+    max-width: 500px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+}
+
+.modal-header {
+    padding: 15px 20px;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h3 {
+    margin: 0;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #666;
+}
+
+.modal-body {
+    padding: 20px;
+}
+
+.modal-footer {
+    padding: 15px 20px;
+    border-top: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+</style>
+
+<script>
+function abrirModalRejeicao(atividadeId, titulo) {
+    document.getElementById('modal-rejeicao').style.display = 'flex';
+    document.getElementById('atividade-titulo').textContent = titulo;
+    document.getElementById('form-rejeicao').action = '/estagio/atividades/' + atividadeId + '/rejeitar/';
+}
+
+function fecharModal() {
+    document.getElementById('modal-rejeicao').style.display = 'none';
+    document.getElementById('justificativa').value = '';
+}
+
+// Fechar modal ao clicar fora
+document.getElementById('modal-rejeicao').addEventListener('click', function(e) {
+    if (e.target === this) {
+        fecharModal();
+    }
+});
+</script>
+{% endblock %}

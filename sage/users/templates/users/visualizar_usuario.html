@@ -1,0 +1,143 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ usuario.first_name }} - Usuário{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h2><i class="fas fa-user"></i> {{ usuario.first_name }} {{ usuario.last_name }}</h2>
+        <div class="header-actions">
+            <a href="{% url 'users:editar_usuario' usuario.id %}" class="btn btn-warning">
+                <i class="fas fa-edit"></i> Editar
+            </a>
+            <a href="{% url 'users:atribuir_nivel_acesso' usuario.id %}" class="btn btn-primary">
+                <i class="fas fa-key"></i> Atribuir Nível
+            </a>
+            <a href="{% url 'users:listar_usuarios' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Voltar
+            </a>
+        </div>
+    </div>
+
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <div class="col-6">
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-info-circle"></i> Dados do Usuário</h3>
+                </div>
+                <div class="card-body">
+                    <div class="info-group">
+                        <label>Nome Completo</label>
+                        <p>{{ usuario.first_name }} {{ usuario.last_name }}</p>
+                    </div>
+                    <div class="info-group">
+                        <label>Username</label>
+                        <p>@{{ usuario.username }}</p>
+                    </div>
+                    <div class="info-group">
+                        <label>Email</label>
+                        <p>{{ usuario.email }}</p>
+                    </div>
+                    <div class="info-group">
+                        <label>Tipo de Perfil</label>
+                        <p>
+                            <span class="badge badge-tipo-{{ usuario.tipo }}">
+                                {{ usuario.get_tipo_display }}
+                            </span>
+                        </p>
+                    </div>
+                    <div class="info-group">
+                        <label>Status</label>
+                        <p>
+                            {% if usuario.is_active %}
+                            <span class="badge badge-success">Ativo</span>
+                            {% else %}
+                            <span class="badge badge-secondary">Inativo</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-6">
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-key"></i> Nível de Acesso</h3>
+                </div>
+                <div class="card-body">
+                    {% if usuario.nivel_acesso %}
+                    <div class="info-group">
+                        <label>Nível Atual</label>
+                        <p>
+                            <a href="{% url 'users:visualizar_nivel_acesso' usuario.nivel_acesso.id %}">
+                                <strong>{{ usuario.nivel_acesso.nome }}</strong>
+                            </a>
+                        </p>
+                    </div>
+                    {% if usuario.nivel_acesso.descricao %}
+                    <div class="info-group">
+                        <label>Descrição</label>
+                        <p>{{ usuario.nivel_acesso.descricao }}</p>
+                    </div>
+                    {% endif %}
+                    <div class="info-group">
+                        <label>Permissões</label>
+                        <div class="permissoes-list">
+                            {% for perm in usuario.nivel_acesso.permissoes.all %}
+                            <span class="badge badge-light">{{ perm.name }}</span>
+                            {% empty %}
+                            <span class="text-muted">Nenhuma permissão específica</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% else %}
+                    <p class="text-muted">Nenhum nível de acesso atribuído.</p>
+                    <a href="{% url 'users:atribuir_nivel_acesso' usuario.id %}" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Atribuir Nível
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h3><i class="fas fa-clock"></i> Informações de Acesso</h3>
+                </div>
+                <div class="card-body">
+                    <div class="info-group">
+                        <label>Data de Cadastro</label>
+                        <p>{{ usuario.date_joined|date:"d/m/Y H:i" }}</p>
+                    </div>
+                    <div class="info-group">
+                        <label>Último Login</label>
+                        <p>{{ usuario.last_login|date:"d/m/Y H:i"|default:"Nunca" }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.badge-tipo-aluno { background: #17a2b8; color: white; }
+.badge-tipo-supervisor { background: #28a745; color: white; }
+.badge-tipo-coordenador { background: #6f42c1; color: white; }
+
+.permissoes-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+</style>
+{% endblock %}
