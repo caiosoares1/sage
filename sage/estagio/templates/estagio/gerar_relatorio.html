@@ -201,7 +201,7 @@ function exportarRelatorio(formato) {
     params.set('exportar', 'true');
     
     // Redireciona para a URL de exportação
-    window.location.href = '{% url "estagio:api_relatorio_exportar" %}?' + params.toString();
+    window.location.href = '{% url "api_relatorio_exportar" %}?' + params.toString();
 }
 </script>
 

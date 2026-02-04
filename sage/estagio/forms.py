@@ -299,6 +299,8 @@ class VinculoAlunoVagaForm(forms.Form):
     CA4 - Exibe apenas vagas disponíveis
     CA5 - Valida que aluno só pode ter uma vaga ativa
     CA6 - Impede vínculo duplicado
+    
+    O parâmetro `instituicao` filtra os alunos pela instituição do coordenador.
     """
     
     aluno = forms.ModelChoiceField(
@@ -332,7 +334,10 @@ class VinculoAlunoVagaForm(forms.Form):
     )
     
     def __init__(self, *args, **kwargs):
+        # Extrai o parâmetro instituicao antes de chamar super()
+        self.instituicao = kwargs.pop('instituicao', None)
         super().__init__(*args, **kwargs)
+        
         # CA4 - Exibe apenas vagas disponíveis (aprovadas e com status_vaga='disponivel')
         self.fields['vaga'].queryset = Estagio.objects.filter(
             status='aprovado',
@@ -340,9 +345,15 @@ class VinculoAlunoVagaForm(forms.Form):
         ).select_related('empresa', 'supervisor')
         
         # Exibe apenas alunos que não possuem vaga ativa (CA5)
-        self.fields['aluno'].queryset = Aluno.objects.filter(
+        # Filtra pela instituição do coordenador se fornecida
+        alunos_queryset = Aluno.objects.filter(
             estagio__isnull=True
         ).select_related('usuario', 'instituicao')
+        
+        if self.instituicao:
+            alunos_queryset = alunos_queryset.filter(instituicao=self.instituicao)
+        
+        self.fields['aluno'].queryset = alunos_queryset
     
     def clean_aluno(self):
         aluno = self.cleaned_data.get('aluno')

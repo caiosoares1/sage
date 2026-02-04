@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+
+{% block title %}Vínculos Ativos - Sistema de Gestão de Estágios{% endblock %}
+
+{% block nav_coordenador_vinculos %}active{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2><i class="fas fa-link"></i> Vínculos Aluno-Vaga</h2>
+    <p>Gerencie os vínculos ativos entre alunos e vagas de estágio</p>
+</div>
+
+<!-- Estatísticas -->
+<div class="stats-cards">
+    <div class="stat-card stat-success">
+        <div class="stat-icon"><i class="fas fa-link"></i></div>
+        <div class="stat-info">
+            <span class="stat-value">{{ stats.total_vinculados }}</span>
+            <span class="stat-label">Alunos Vinculados</span>
+        </div>
+    </div>
+    <div class="stat-card stat-warning">
+        <div class="stat-icon"><i class="fas fa-user-clock"></i></div>
+        <div class="stat-info">
+            <span class="stat-value">{{ stats.alunos_sem_vinculo }}</span>
+            <span class="stat-label">Aguardando Vínculo</span>
+        </div>
+    </div>
+</div>
+
+<!-- Ação Rápida -->
+<div class="action-buttons">
+    <a href="{% url 'coordenador:vincular_aluno_vaga' %}" class="btn btn-primary">
+        <i class="fas fa-plus"></i> Novo Vínculo
+    </a>
+    <a href="{% url 'coordenador:listar_vagas_disponiveis' %}" class="btn btn-secondary">
+        <i class="fas fa-briefcase"></i> Ver Vagas Disponíveis
+    </a>
+</div>
+
+<!-- Filtros -->
+<div class="filters-section">
+    <form method="get" class="filter-form">
+        <div class="filter-group">
+            <label for="aluno">Aluno:</label>
+            <input type="text" name="aluno" id="aluno" value="{{ filtro_aluno }}" 
+                   class="form-control" placeholder="Nome do aluno">
+        </div>
+        <div class="filter-group">
+            <label for="empresa">Empresa:</label>
+            <input type="text" name="empresa" id="empresa" value="{{ filtro_empresa }}" 
+                   class="form-control" placeholder="Nome da empresa">
+        </div>
+        <button type="submit" class="btn btn-primary">
+            <i class="fas fa-search"></i> Filtrar
+        </button>
+        {% if filtro_aluno or filtro_empresa %}
+        <a href="{% url 'coordenador:listar_vinculos' %}" class="btn btn-secondary">
+            <i class="fas fa-times"></i> Limpar
+        </a>
+        {% endif %}
+    </form>
+</div>
+
+<!-- Lista de Vínculos -->
+<div class="table-container">
+    <h3><i class="fas fa-list"></i> Vínculos Ativos</h3>
+    
+    {% if alunos_vinculados %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Aluno</th>
+                <th>Instituição</th>
+                <th>Empresa</th>
+                <th>Supervisor</th>
+                <th>Estágio</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for aluno in alunos_vinculados %}
+            <tr>
+                <td>
+                    <strong>{{ aluno.nome }}</strong>
+                    <br><small class="text-muted">{{ aluno.usuario.email }}</small>
+                </td>
+                <td>{{ aluno.instituicao.nome|default:"-" }}</td>
+                <td>{{ aluno.estagio.empresa.razao_social }}</td>
+                <td>{{ aluno.estagio.supervisor.nome|default:"-" }}</td>
+                <td>
+                    <span class="status-badge status-success">
+                        {{ aluno.estagio.get_status_display }}
+                    </span>
+                </td>
+                <td class="actions">
+                    <a href="{% url 'coordenador:historico_vinculo_aluno' aluno.id %}" 
+                       class="btn btn-sm btn-info" title="Histórico">
+                        <i class="fas fa-history"></i>
+                    </a>
+                    <a href="{% url 'coordenador:desvincular_aluno_vaga' aluno.id %}" 
+                       class="btn btn-sm btn-danger" title="Desvincular"
+                       onclick="return confirm('Tem certeza que deseja desvincular este aluno?');">
+                        <i class="fas fa-unlink"></i>
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+        <i class="fas fa-link"></i>
+        <p>Nenhum vínculo ativo encontrado.</p>
+        <p class="text-muted">Clique em "Novo Vínculo" para associar um aluno a uma vaga.</p>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.action-buttons {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+</style>
+{% endblock %}

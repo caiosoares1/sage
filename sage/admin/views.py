@@ -11,7 +11,7 @@ from .models import CursoCoordenador, Supervisor, Empresa, Instituicao
 from .forms import SupervisorForm, SupervisorEditForm, EmpresaForm, EmpresaEditForm, InstituicaoForm, InstituicaoEditForm
 from users.models import Usuario
 from utils.email import enviar_notificacao_email
-from utils.decorators import supervisor_required, coordenador_required, admin_required
+from utils.decorators import supervisor_required, coordenador_required, coordenador_only_required, admin_required
 import logging
 
 logger = logging.getLogger(__name__)
@@ -364,18 +364,84 @@ def registrar_historico(documento, acao, usuario, observacoes=None):
     )
 
 @login_required
+@coordenador_required
 def aprovar_estagio(request, estagio_id):
-    """View para aprovar um estágio"""
-    estagio = get_object_or_404(Estagio, id=estagio_id)
-    estagio.status = "aprovado"
-    estagio.save()
-    messages.success(request, f"Estágio '{estagio.titulo}' foi aprovado com sucesso!")
-    enviar_notificacao_email(
-        destinatario="email@gmail.com",
-        assunto="Estágio Aprovado",
-        mensagem=f"Seu estágio '{estagio.titulo}' foi aprovado com sucesso!"
-    )
-    return redirect("estagio_detalhe", estagio.id)
+    """
+    View para aprovar um estágio e vincular o aluno à vaga.
+    Apenas o coordenador da mesma instituição do aluno pode aprovar.
+    
+    Quando aprovado:
+    - Status do estágio muda para 'aprovado' 
+    - Status da vaga muda para 'ocupada'
+    - Aluno é vinculado ao estágio (aluno.estagio = estagio)
+    """
+    try:
+        # Busca o coordenador logado
+        usuario = Usuario.objects.get(id=request.user.id)
+        coordenador = CursoCoordenador.objects.get(usuario=usuario)
+        
+        estagio = get_object_or_404(Estagio, id=estagio_id)
+        
+        # Verifica se o aluno solicitante é da mesma instituição do coordenador
+        aluno = estagio.aluno_solicitante
+        if aluno and aluno.instituicao != coordenador.instituicao:
+            messages.error(
+                request, 
+                "Você não tem permissão para aprovar este estágio. "
+                "O aluno pertence a outra instituição."
+            )
+            return redirect('coordenador:listar_solicitacoes_coordenador')
+        
+        # Aprova o estágio
+        estagio.status = "aprovado"
+        estagio.status_vaga = "ocupada"  # Vaga fica ocupada
+        estagio.save()
+        
+        # VINCULA o aluno ao estágio
+        if aluno:
+            aluno.estagio = estagio
+            aluno.save()
+            
+            # Registra no histórico de vínculos
+            from estagio.models import VinculoHistorico
+            VinculoHistorico.objects.create(
+                aluno=aluno,
+                estagio=estagio,
+                acao='vinculado',
+                realizado_por=usuario,
+                observacoes=f'Estágio aprovado pelo coordenador {coordenador.nome}'
+            )
+        
+        messages.success(
+            request, 
+            f"Estágio '{estagio.titulo}' aprovado! "
+            f"Aluno {aluno.nome if aluno else 'N/A'} vinculado com sucesso."
+        )
+        
+        # Notifica o aluno
+        if aluno:
+            enviar_notificacao_email(
+                destinatario=aluno.usuario.email,
+                assunto="🎉 Estágio Aprovado!",
+                mensagem=f"""
+                Parabéns {aluno.nome}!
+                
+                Seu estágio '{estagio.titulo}' foi aprovado com sucesso!
+                
+                Detalhes:
+                - Empresa: {estagio.empresa.razao_social}
+                - Supervisor: {estagio.supervisor.nome}
+                - Início: {estagio.data_inicio.strftime('%d/%m/%Y')}
+                
+                Você já está vinculado(a) a esta vaga.
+                """
+            )
+        
+        return redirect("estagio_detalhe", estagio.id)
+        
+    except (Usuario.DoesNotExist, CursoCoordenador.DoesNotExist):
+        messages.error(request, "Coordenador não encontrado!")
+        return redirect('dashboard')
 
 
 
@@ -383,26 +449,131 @@ def aprovar_estagio(request, estagio_id):
 
 
 @login_required
+@coordenador_required
 def reprovar_estagio(request, estagio_id):
-    """View para reprovar um estágio"""
-    estagio = get_object_or_404(Estagio, id=estagio_id)
-    estagio.status = "reprovado"
-    estagio.save()
-    messages.success(request, f"Estágio '{estagio.titulo}' foi reprovado!")
-    enviar_notificacao_email(
-        destinatario="email@gmail.com",
-        assunto="Estágio Reprovado",
-        mensagem=f"Seu estágio '{estagio.titulo}' foi reprovado com sucesso!"
-    )
-    return redirect("estagio_detalhe", estagio.id)
+    """
+    View para reprovar um estágio.
+    Apenas o coordenador da mesma instituição do aluno pode reprovar.
+    
+    Quando reprovado:
+    - Status do estágio muda para 'reprovado'
+    - Vaga volta a ficar disponível para outros alunos
+    - Aluno solicitante é removido da vaga
+    """
+    try:
+        # Busca o coordenador logado
+        usuario = Usuario.objects.get(id=request.user.id)
+        coordenador = CursoCoordenador.objects.get(usuario=usuario)
+        
+        estagio = get_object_or_404(Estagio, id=estagio_id)
+        
+        # Verifica se o aluno solicitante é da mesma instituição do coordenador
+        aluno = estagio.aluno_solicitante
+        if aluno and aluno.instituicao != coordenador.instituicao:
+            messages.error(
+                request, 
+                "Você não tem permissão para reprovar este estágio. "
+                "O aluno pertence a outra instituição."
+            )
+            return redirect('coordenador:listar_solicitacoes_coordenador')
+        
+        # Reprova o estágio
+        estagio.status = "reprovado"
+        estagio.status_vaga = "disponivel"  # Vaga volta a ficar disponível
+        estagio.aluno_solicitante = None  # Remove o aluno solicitante
+        estagio.save()
+        
+        messages.success(request, f"Estágio '{estagio.titulo}' foi reprovado. A vaga está novamente disponível.")
+        
+        # Notifica o aluno
+        if aluno:
+            enviar_notificacao_email(
+                destinatario=aluno.usuario.email,
+                assunto="Solicitação de Estágio Reprovada",
+                mensagem=f"""
+                Olá {aluno.nome},
+                
+                Infelizmente sua solicitação para o estágio '{estagio.titulo}' foi reprovada.
+                
+                Você pode se candidatar a outras vagas disponíveis no sistema.
+                
+                Em caso de dúvidas, entre em contato com a coordenação.
+                """
+            )
+        
+        return redirect('coordenador:listar_solicitacoes_coordenador')
+        
+    except (Usuario.DoesNotExist, CursoCoordenador.DoesNotExist):
+        messages.error(request, "Coordenador não encontrado!")
+        
+    except (Usuario.DoesNotExist, CursoCoordenador.DoesNotExist):
+        messages.error(request, "Coordenador não encontrado!")
+        return redirect('dashboard')
 
 
 
 @login_required
+@coordenador_required
 def listar_solicitacoes_coordenador(request):
-    """View para o coordenador visualizar todas as solicitações de estágio em análise"""
-    # Redireciona para a view correta de aprovação de documentos
-    return redirect('aprovar_documentos_coordenador')
+    """
+    View para o coordenador visualizar solicitações de estágio em análise.
+    Mostra apenas estágios solicitados por alunos da sua instituição.
+    """
+    try:
+        # Busca o coordenador logado
+        usuario = Usuario.objects.get(id=request.user.id)
+        coordenador = CursoCoordenador.objects.get(usuario=usuario)
+        
+        # Busca estágios em análise de alunos da instituição do coordenador
+        estagios = Estagio.objects.filter(
+            aluno_solicitante__instituicao=coordenador.instituicao
+        ).select_related(
+            'empresa',
+            'supervisor',
+            'aluno_solicitante'
+        ).order_by('-data_solicitacao')
+        
+        # Filtro por status
+        filtro_status = request.GET.get('status', 'analise')
+        if filtro_status:
+            estagios = estagios.filter(status=filtro_status)
+        
+        # Filtro por aluno
+        filtro_aluno = request.GET.get('aluno', '')
+        if filtro_aluno:
+            estagios = estagios.filter(aluno_solicitante__nome__icontains=filtro_aluno)
+        
+        # Estatísticas
+        stats = {
+            'em_analise': Estagio.objects.filter(
+                aluno_solicitante__instituicao=coordenador.instituicao,
+                status='analise'
+            ).count(),
+            'aprovados': Estagio.objects.filter(
+                aluno_solicitante__instituicao=coordenador.instituicao,
+                status='aprovado'
+            ).count(),
+            'reprovados': Estagio.objects.filter(
+                aluno_solicitante__instituicao=coordenador.instituicao,
+                status='reprovado'
+            ).count(),
+            'total': Estagio.objects.filter(
+                aluno_solicitante__instituicao=coordenador.instituicao
+            ).count(),
+        }
+        
+        context = {
+            'estagios': estagios,
+            'coordenador': coordenador,
+            'filtro_status': filtro_status,
+            'filtro_aluno': filtro_aluno,
+            'stats': stats,
+        }
+        return render(request, 'admin/listar_solicitacoes_coordenador.html', context)
+        
+    except (Usuario.DoesNotExist, CursoCoordenador.DoesNotExist):
+        messages.error(request, "Coordenador não encontrado!")
+        return redirect('dashboard')
 
 
 @login_required
@@ -1088,42 +1259,56 @@ def historico_atividade(request, atividade_id):
 def listar_vagas_disponiveis(request):
     """
     View para listar vagas disponíveis para vínculo - CA4
-    Exibe apenas vagas com status aprovado e status_vaga disponível
+    Exibe apenas vagas com status aprovado e status_vaga disponível.
+    Filtra por alunos da instituição do coordenador.
     """
     from estagio.models import Aluno
     
-    # CA4 - Busca apenas vagas disponíveis
-    vagas = Estagio.objects.filter(
-        status='aprovado',
-        status_vaga='disponivel'
-    ).select_related('empresa', 'supervisor').order_by('titulo')
-    
-    # Filtro por empresa
-    filtro_empresa = request.GET.get('empresa', '')
-    if filtro_empresa:
-        vagas = vagas.filter(empresa__razao_social__icontains=filtro_empresa)
-    
-    # Filtro por título
-    filtro_titulo = request.GET.get('titulo', '')
-    if filtro_titulo:
-        vagas = vagas.filter(titulo__icontains=filtro_titulo)
-    
-    # Busca alunos sem vínculo para estatísticas
-    alunos_disponiveis = Aluno.objects.filter(estagio__isnull=True).count()
-    
-    # Estatísticas
-    stats = {
-        'total_vagas': vagas.count(),
-        'alunos_disponiveis': alunos_disponiveis,
-    }
-    
-    context = {
-        'vagas': vagas,
-        'filtro_empresa': filtro_empresa,
-        'filtro_titulo': filtro_titulo,
-        'stats': stats,
-    }
-    return render(request, 'admin/listar_vagas_disponiveis.html', context)
+    try:
+        # Busca o coordenador logado
+        usuario = Usuario.objects.get(id=request.user.id)
+        coordenador = CursoCoordenador.objects.get(usuario=usuario)
+        
+        # CA4 - Busca apenas vagas disponíveis
+        vagas = Estagio.objects.filter(
+            status='aprovado',
+            status_vaga='disponivel'
+        ).select_related('empresa', 'supervisor').order_by('titulo')
+        
+        # Filtro por empresa
+        filtro_empresa = request.GET.get('empresa', '')
+        if filtro_empresa:
+            vagas = vagas.filter(empresa__razao_social__icontains=filtro_empresa)
+        
+        # Filtro por título
+        filtro_titulo = request.GET.get('titulo', '')
+        if filtro_titulo:
+            vagas = vagas.filter(titulo__icontains=filtro_titulo)
+        
+        # Busca alunos sem vínculo DA INSTITUIÇÃO DO COORDENADOR
+        alunos_disponiveis = Aluno.objects.filter(
+            estagio__isnull=True,
+            instituicao=coordenador.instituicao
+        ).count()
+        
+        # Estatísticas
+        stats = {
+            'total_vagas': vagas.count(),
+            'alunos_disponiveis': alunos_disponiveis,
+        }
+        
+        context = {
+            'vagas': vagas,
+            'filtro_empresa': filtro_empresa,
+            'filtro_titulo': filtro_titulo,
+            'stats': stats,
+            'coordenador': coordenador,
+        }
+        return render(request, 'admin/listar_vagas_disponiveis.html', context)
+        
+    except (Usuario.DoesNotExist, CursoCoordenador.DoesNotExist):
+        messages.error(request, "Coordenador não encontrado!")
+        return redirect('dashboard')
 
 
 @login_required
@@ -1131,76 +1316,96 @@ def listar_vagas_disponiveis(request):
 def vincular_aluno_vaga(request):
     """
     View para realizar o vínculo entre aluno e vaga - CA5, CA6, CA7, CA8
+    Coordenador só pode vincular alunos da sua instituição.
     """
     from estagio.forms import VinculoAlunoVagaForm
     from estagio.models import Aluno
     
-    if request.method == 'POST':
-        form = VinculoAlunoVagaForm(request.POST)
+    try:
+        # Busca o coordenador logado
+        usuario = Usuario.objects.get(id=request.user.id)
+        coordenador = CursoCoordenador.objects.get(usuario=usuario)
         
-        if form.is_valid():
-            aluno = form.cleaned_data['aluno']
-            vaga = form.cleaned_data['vaga']
-            observacoes = form.cleaned_data.get('observacoes', '')
+        if request.method == 'POST':
+            form = VinculoAlunoVagaForm(request.POST, instituicao=coordenador.instituicao)
             
-            try:
-                # CA5 - Verifica novamente se aluno já tem vaga ativa
-                if aluno.estagio is not None:
+            if form.is_valid():
+                aluno = form.cleaned_data['aluno']
+                vaga = form.cleaned_data['vaga']
+                observacoes = form.cleaned_data.get('observacoes', '')
+                
+                # Validação extra: verifica se o aluno é da instituição do coordenador
+                if aluno.instituicao != coordenador.instituicao:
                     messages.error(
                         request, 
-                        f'O aluno {aluno.nome} já está vinculado a uma vaga ativa.'
+                        "Você não tem permissão para vincular este aluno. "
+                        "O aluno pertence a outra instituição."
                     )
                     return redirect('coordenador:vincular_aluno_vaga')
                 
-                # CA7 - Vincula o aluno à vaga (atualiza status_vaga automaticamente)
-                # CA8 - Registra histórico (feito dentro do método)
-                vaga.vincular_aluno(aluno, realizado_por=request.user)
-                
-                messages.success(
-                    request,
-                    f'Aluno {aluno.nome} vinculado com sucesso à vaga "{vaga.titulo}"!'
-                )
-                
-                # Notifica o aluno por email
                 try:
-                    enviar_notificacao_email(
-                        destinatario=aluno.contato,
-                        assunto='Vínculo de Estágio Realizado',
-                        mensagem=f'''
-                        Olá {aluno.nome},
-                        
-                        Você foi vinculado(a) à vaga de estágio "{vaga.titulo}" na empresa {vaga.empresa.razao_social}.
-                        
-                        Detalhes da vaga:
-                        - Cargo: {vaga.cargo}
-                        - Carga horária: {vaga.carga_horaria}h/semana
-                        - Início: {vaga.data_inicio.strftime("%d/%m/%Y")}
-                        - Supervisor: {vaga.supervisor.nome}
-                        
-                        Atenciosamente,
-                        Sistema SAGE
-                        '''
+                    # CA5 - Verifica novamente se aluno já tem vaga ativa
+                    if aluno.estagio is not None:
+                        messages.error(
+                            request, 
+                            f'O aluno {aluno.nome} já está vinculado a uma vaga ativa.'
+                        )
+                        return redirect('coordenador:vincular_aluno_vaga')
+                    
+                    # CA7 - Vincula o aluno à vaga (atualiza status_vaga automaticamente)
+                    # CA8 - Registra histórico (feito dentro do método)
+                    vaga.vincular_aluno(aluno, realizado_por=request.user)
+                    
+                    messages.success(
+                        request,
+                        f'Aluno {aluno.nome} vinculado com sucesso à vaga "{vaga.titulo}"!'
                     )
+                    
+                    # Notifica o aluno por email
+                    try:
+                        enviar_notificacao_email(
+                            destinatario=aluno.contato,
+                            assunto='Vínculo de Estágio Realizado',
+                            mensagem=f'''
+                            Olá {aluno.nome},
+                            
+                            Você foi vinculado(a) à vaga de estágio "{vaga.titulo}" na empresa {vaga.empresa.razao_social}.
+                            
+                            Detalhes da vaga:
+                            - Cargo: {vaga.cargo}
+                            - Carga horária: {vaga.carga_horaria}h/semana
+                            - Início: {vaga.data_inicio.strftime("%d/%m/%Y")}
+                            - Supervisor: {vaga.supervisor.nome}
+                            
+                            Atenciosamente,
+                            Sistema SAGE
+                            '''
+                        )
+                    except Exception as e:
+                        logger.error(f"Erro ao enviar notificação de vínculo: {e}")
+                    
+                    return redirect('coordenador:listar_vagas_disponiveis')
+                    
                 except Exception as e:
-                    logger.error(f"Erro ao enviar notificação de vínculo: {e}")
-                
-                return redirect('coordenador:listar_vagas_disponiveis')
-                
-            except Exception as e:
-                logger.error(f"Erro ao vincular aluno à vaga: {e}")
-                messages.error(request, f'Erro ao realizar o vínculo: {str(e)}')
+                    logger.error(f"Erro ao vincular aluno à vaga: {e}")
+                    messages.error(request, f'Erro ao realizar o vínculo: {str(e)}')
+            else:
+                # Adiciona erros do formulário como mensagens
+                for field, errors in form.errors.items():
+                    for error in errors:
+                        messages.error(request, error)
         else:
-            # Adiciona erros do formulário como mensagens
-            for field, errors in form.errors.items():
-                for error in errors:
-                    messages.error(request, error)
-    else:
-        form = VinculoAlunoVagaForm()
-    
-    context = {
-        'form': form,
-    }
-    return render(request, 'admin/vincular_aluno_vaga.html', context)
+            form = VinculoAlunoVagaForm(instituicao=coordenador.instituicao)
+        
+        context = {
+            'form': form,
+            'coordenador': coordenador,
+        }
+        return render(request, 'admin/vincular_aluno_vaga.html', context)
+        
+    except (Usuario.DoesNotExist, CursoCoordenador.DoesNotExist):
+        messages.error(request, "Coordenador não encontrado!")
+        return redirect('dashboard')
 
 
 @login_required
@@ -1208,84 +1413,118 @@ def vincular_aluno_vaga(request):
 def desvincular_aluno_vaga(request, aluno_id):
     """
     View para desvincular um aluno de uma vaga - CA8
+    Apenas coordenador da mesma instituição pode desvincular.
     """
     from estagio.models import Aluno
     
-    aluno = get_object_or_404(Aluno.objects.select_related('estagio'), id=aluno_id)
-    
-    if aluno.estagio is None:
-        messages.warning(request, f'O aluno {aluno.nome} não está vinculado a nenhuma vaga.')
-        return redirect('coordenador:listar_vinculos')
-    
-    if request.method == 'POST':
-        observacoes = request.POST.get('observacoes', '')
-        vaga = aluno.estagio
+    try:
+        # Busca o coordenador logado
+        usuario = Usuario.objects.get(id=request.user.id)
+        coordenador = CursoCoordenador.objects.get(usuario=usuario)
         
-        try:
-            # CA8 - Registra histórico e desvincula
-            vaga.desvincular_aluno(aluno, realizado_por=request.user, observacoes=observacoes)
-            
-            messages.success(
-                request,
-                f'Aluno {aluno.nome} desvinculado com sucesso da vaga "{vaga.titulo}"!'
+        aluno = get_object_or_404(Aluno.objects.select_related('estagio', 'instituicao'), id=aluno_id)
+        
+        # Valida se o aluno pertence à mesma instituição
+        if aluno.instituicao != coordenador.instituicao:
+            messages.error(
+                request, 
+                "Você não tem permissão para desvincular este aluno. "
+                "O aluno pertence a outra instituição."
             )
-            
             return redirect('coordenador:listar_vinculos')
+        
+        if aluno.estagio is None:
+            messages.warning(request, f'O aluno {aluno.nome} não está vinculado a nenhuma vaga.')
+            return redirect('coordenador:listar_vinculos')
+        
+        if request.method == 'POST':
+            observacoes = request.POST.get('observacoes', '')
+            vaga = aluno.estagio
             
-        except Exception as e:
-            logger.error(f"Erro ao desvincular aluno: {e}")
-            messages.error(request, f'Erro ao desvincular aluno: {str(e)}')
-    
-    context = {
-        'aluno': aluno,
-        'vaga': aluno.estagio,
-    }
-    return render(request, 'admin/desvincular_aluno_vaga.html', context)
+            try:
+                # CA8 - Registra histórico e desvincula
+                vaga.desvincular_aluno(aluno, realizado_por=request.user, observacoes=observacoes)
+                
+                messages.success(
+                    request,
+                    f'Aluno {aluno.nome} desvinculado com sucesso da vaga "{vaga.titulo}"!'
+                )
+                
+                return redirect('coordenador:listar_vinculos')
+                
+            except Exception as e:
+                logger.error(f"Erro ao desvincular aluno: {e}")
+                messages.error(request, f'Erro ao desvincular aluno: {str(e)}')
+        
+        context = {
+            'aluno': aluno,
+            'vaga': aluno.estagio,
+        }
+        return render(request, 'admin/desvincular_aluno_vaga.html', context)
+        
+    except (Usuario.DoesNotExist, CursoCoordenador.DoesNotExist):
+        messages.error(request, "Coordenador não encontrado!")
+        return redirect('dashboard')
 
 
 @login_required
 @coordenador_required
 def listar_vinculos(request):
     """
-    View para listar todos os vínculos ativos entre alunos e vagas
+    View para listar vínculos ativos entre alunos e vagas.
+    Filtra apenas alunos da instituição do coordenador.
     """
     from estagio.models import Aluno
     
-    # Busca alunos com vínculo ativo
-    alunos_vinculados = Aluno.objects.filter(
-        estagio__isnull=False
-    ).select_related(
-        'estagio__empresa',
-        'estagio__supervisor',
-        'usuario',
-        'instituicao'
-    ).order_by('nome')
-    
-    # Filtro por nome do aluno
-    filtro_aluno = request.GET.get('aluno', '')
-    if filtro_aluno:
-        alunos_vinculados = alunos_vinculados.filter(nome__icontains=filtro_aluno)
-    
-    # Filtro por empresa
-    filtro_empresa = request.GET.get('empresa', '')
-    if filtro_empresa:
-        alunos_vinculados = alunos_vinculados.filter(
-            estagio__empresa__razao_social__icontains=filtro_empresa
-        )
-    
-    # Estatísticas
-    stats = {
-        'total_vinculados': alunos_vinculados.count(),
-        'alunos_sem_vinculo': Aluno.objects.filter(estagio__isnull=True).count(),
-    }
-    
-    context = {
-        'alunos_vinculados': alunos_vinculados,
-        'filtro_aluno': filtro_aluno,
-        'filtro_empresa': filtro_empresa,
-        'stats': stats,
-    }
-    return render(request, 'admin/listar_vinculos.html', context)
+    try:
+        # Busca o coordenador logado
+        usuario = Usuario.objects.get(id=request.user.id)
+        coordenador = CursoCoordenador.objects.get(usuario=usuario)
+        
+        # Busca alunos com vínculo ativo DA INSTITUIÇÃO DO COORDENADOR
+        alunos_vinculados = Aluno.objects.filter(
+            estagio__isnull=False,
+            instituicao=coordenador.instituicao
+        ).select_related(
+            'estagio__empresa',
+            'estagio__supervisor',
+            'usuario',
+            'instituicao'
+        ).order_by('nome')
+        
+        # Filtro por nome do aluno
+        filtro_aluno = request.GET.get('aluno', '')
+        if filtro_aluno:
+            alunos_vinculados = alunos_vinculados.filter(nome__icontains=filtro_aluno)
+        
+        # Filtro por empresa
+        filtro_empresa = request.GET.get('empresa', '')
+        if filtro_empresa:
+            alunos_vinculados = alunos_vinculados.filter(
+                estagio__empresa__razao_social__icontains=filtro_empresa
+            )
+        
+        # Estatísticas (apenas da instituição do coordenador)
+        stats = {
+            'total_vinculados': alunos_vinculados.count(),
+            'alunos_sem_vinculo': Aluno.objects.filter(
+                estagio__isnull=True,
+                instituicao=coordenador.instituicao
+            ).count(),
+        }
+        
+        context = {
+            'alunos_vinculados': alunos_vinculados,
+            'filtro_aluno': filtro_aluno,
+            'filtro_empresa': filtro_empresa,
+            'stats': stats,
+            'coordenador': coordenador,
+        }
+        return render(request, 'admin/listar_vinculos.html', context)
+        
+    except (Usuario.DoesNotExist, CursoCoordenador.DoesNotExist):
+        messages.error(request, "Coordenador não encontrado!")
+        return redirect('dashboard')
 
 
 @login_required
@@ -1956,7 +2195,7 @@ def alternar_disponibilidade_parecer(request, avaliacao_id):
 # Sprint 03 - TASK 22208, 22209
 
 @login_required
-@coordenador_required
+@coordenador_only_required
 def painel_estagios(request):
     """
     View para exibir o painel administrativo de estágios.
@@ -1974,7 +2213,7 @@ def painel_estagios(request):
     
     # Buscar estágios com filtros
     estagios = Estagio.objects.all().select_related(
-        'aluno', 'aluno__usuario', 'empresa', 'supervisor', 'supervisor__usuario'
+        'aluno_solicitante', 'aluno_solicitante__usuario', 'empresa', 'supervisor', 'supervisor__usuario'
     ).order_by('-data_inicio')
     
     # Filtros
@@ -1989,7 +2228,7 @@ def painel_estagios(request):
         estagios = estagios.filter(empresa_id=filtro_empresa)
     
     if filtro_curso:
-        estagios = estagios.filter(aluno__curso_id=filtro_curso)
+        estagios = estagios.filter(aluno_solicitante__instituicao__cursocoordenador__codigo_curso=filtro_curso)
     
     # Calcular percentual de conclusão para cada estágio
     for estagio in estagios:
@@ -2005,7 +2244,7 @@ def painel_estagios(request):
             estagio.percentual_conclusao = 0
     
     # Paginação
-    paginator = Paginator(estagios, 20)
+    paginator = Paginator(estagios, 10)
     page = request.GET.get('page')
     estagios = paginator.get_page(page)
     

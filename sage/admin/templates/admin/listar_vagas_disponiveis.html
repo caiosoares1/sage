@@ -1,0 +1,121 @@
+{% extends 'base.html' %}
+
+{% block title %}Vagas Disponíveis - Sistema de Gestão de Estágios{% endblock %}
+
+{% block nav_coordenador_vagas %}active{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2><i class="fas fa-briefcase"></i> Vagas Disponíveis</h2>
+    <p>Gerencie as vagas de estágio disponíveis para vínculo com alunos</p>
+</div>
+
+<!-- Estatísticas -->
+<div class="stats-cards">
+    <div class="stat-card stat-success">
+        <div class="stat-icon"><i class="fas fa-briefcase"></i></div>
+        <div class="stat-info">
+            <span class="stat-value">{{ stats.total_vagas }}</span>
+            <span class="stat-label">Vagas Disponíveis</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon"><i class="fas fa-user-graduate"></i></div>
+        <div class="stat-info">
+            <span class="stat-value">{{ stats.alunos_disponiveis }}</span>
+            <span class="stat-label">Alunos Sem Vínculo</span>
+        </div>
+    </div>
+</div>
+
+<!-- Ação Rápida -->
+<div class="action-buttons">
+    <a href="{% url 'coordenador:vincular_aluno_vaga' %}" class="btn btn-primary">
+        <i class="fas fa-link"></i> Vincular Aluno a Vaga
+    </a>
+    <a href="{% url 'coordenador:listar_vinculos' %}" class="btn btn-secondary">
+        <i class="fas fa-list"></i> Ver Vínculos Ativos
+    </a>
+</div>
+
+<!-- Filtros -->
+<div class="filters-section">
+    <form method="get" class="filter-form">
+        <div class="filter-group">
+            <label for="empresa">Empresa:</label>
+            <input type="text" name="empresa" id="empresa" value="{{ filtro_empresa }}" 
+                   class="form-control" placeholder="Nome da empresa">
+        </div>
+        <div class="filter-group">
+            <label for="titulo">Título:</label>
+            <input type="text" name="titulo" id="titulo" value="{{ filtro_titulo }}" 
+                   class="form-control" placeholder="Título da vaga">
+        </div>
+        <button type="submit" class="btn btn-primary">
+            <i class="fas fa-search"></i> Filtrar
+        </button>
+        {% if filtro_empresa or filtro_titulo %}
+        <a href="{% url 'coordenador:listar_vagas_disponiveis' %}" class="btn btn-secondary">
+            <i class="fas fa-times"></i> Limpar
+        </a>
+        {% endif %}
+    </form>
+</div>
+
+<!-- Lista de Vagas -->
+<div class="table-container">
+    <h3><i class="fas fa-list"></i> Vagas Disponíveis para Vínculo</h3>
+    
+    {% if vagas %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Título</th>
+                <th>Empresa</th>
+                <th>Supervisor</th>
+                <th>Carga Horária</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for vaga in vagas %}
+            <tr>
+                <td>
+                    <strong>{{ vaga.titulo }}</strong>
+                </td>
+                <td>{{ vaga.empresa.razao_social }}</td>
+                <td>
+                    {% if vaga.supervisor %}
+                        {{ vaga.supervisor.nome }}
+                    {% else %}
+                        <span class="text-muted">Não definido</span>
+                    {% endif %}
+                </td>
+                <td>{{ vaga.carga_horaria_semanal|default:"-" }}h/sem</td>
+                <td class="actions">
+                    <a href="{% url 'coordenador:vincular_aluno_vaga' %}?vaga={{ vaga.id }}" 
+                       class="btn btn-sm btn-success" title="Vincular Aluno">
+                        <i class="fas fa-user-plus"></i> Vincular
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+        <i class="fas fa-briefcase"></i>
+        <p>Nenhuma vaga disponível para vínculo no momento.</p>
+        <p class="text-muted">Vagas aprovadas com status "disponível" aparecerão aqui.</p>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.action-buttons {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+</style>
+{% endblock %}

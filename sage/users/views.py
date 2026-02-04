@@ -1,8 +1,12 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.core.paginator import Paginator
 from .models import Usuario, NivelAcesso
 from .forms import UsuarioForm, UsuarioEditForm, NivelAcessoForm, NivelAcessoEditForm
+
+# Constante para itens por página
+ITEMS_PER_PAGE = 10
 
 
 # ==================== VIEWS DE NÍVEL DE ACESSO ====================
@@ -230,6 +234,11 @@ def listar_usuarios(request):
     filtro_tipo = request.GET.get('tipo', '')
     if filtro_tipo:
         usuarios = usuarios.filter(tipo=filtro_tipo)
+    
+    # Paginação
+    paginator = Paginator(usuarios, ITEMS_PER_PAGE)
+    page = request.GET.get('page')
+    usuarios = paginator.get_page(page)
     
     context = {
         'usuarios': usuarios,

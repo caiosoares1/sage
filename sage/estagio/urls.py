@@ -54,11 +54,10 @@ urlpatterns = [
     
     # ========== Sprint 03 - Novas Rotas ==========
     
-    # Rotas de Vagas Disponíveis - TASK 22173, 22174
+    # Rotas de Vagas Disponíveis para ALUNO - TASK 22173, 22174
     path('vagas/', views.listar_vagas_disponiveis, name='listar_vagas_disponiveis'),
     path('vagas/<int:estagio_id>/', views.detalhe_vaga, name='detalhe_vaga'),
-    path('vagas/<int:estagio_id>/selecionar-aluno/', views.selecionar_aluno_vaga, name='selecionar_aluno_vaga'),
-    path('vagas/<int:estagio_id>/vincular/', views.vincular_aluno_vaga, name='vincular_aluno_vaga'),
+    path('vagas/<int:estagio_id>/candidatar/', views.candidatar_vaga, name='candidatar_vaga'),
     
     # Rotas de Atividades Pendentes - TASK 22180, 22181, 22182
     path('atividades/', views.listar_atividades_pendentes, name='listar_atividades_pendentes'),

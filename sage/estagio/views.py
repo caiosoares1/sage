@@ -17,6 +17,7 @@ from django.utils.dateparse import parse_date
 from utils.decorators import aluno_required, supervisor_required
 from django.db.models import Sum
 from django.utils import timezone
+from datetime import timedelta
 import logging
 
 logger = logging.getLogger(__name__)
@@ -24,6 +25,11 @@ logger = logging.getLogger(__name__)
 @login_required
 @aluno_required
 def solicitar_estagio(request):
+    """
+    View para aluno solicitar estágio criando uma nova vaga.
+    O aluno preenche os dados da vaga e envia o documento.
+    O vínculo só acontece após aprovação do coordenador.
+    """
     if request.method == "POST":
         estagio_form = EstagioForm(request.POST)
         documento_form = DocumentoForm(request.POST, request.FILES)
@@ -33,16 +39,19 @@ def solicitar_estagio(request):
             # Salva estágio com status inicial "Em análise"
             estagio = estagio_form.save(commit=False)
             estagio.status = "analise"
+            estagio.status_vaga = "disponivel"  # Vaga fica disponível até aprovação
             
-            # Vincula o estágio ao aluno logado
             try:
                 usuario = Usuario.objects.get(id=request.user.id)
                 aluno = Aluno.objects.get(usuario=usuario)
                 estagio.aluno_solicitante = aluno  # Salva o aluno que solicitou
                 estagio.save()
                 
-                aluno.estagio = estagio
-                aluno.save()
+                # NÃO vincula o aluno automaticamente!
+                # O vínculo só acontece quando o coordenador aprovar
+                # aluno.estagio = estagio  # REMOVIDO
+                # aluno.save()  # REMOVIDO
+                
             except (Usuario.DoesNotExist, Aluno.DoesNotExist):
                 messages.error(request, "Erro: Aluno não encontrado.")
                 return redirect("solicitar_estagio")
@@ -79,7 +88,7 @@ def solicitar_estagio(request):
                 mensagem=f"O aluno {aluno.nome} enviou um novo documento para o estágio '{estagio.titulo}'. Por favor, revise o documento."
             )
             
-            messages.success(request, "Documento enviado com sucesso! Sua solicitação está em análise.")
+            messages.success(request, "Solicitação enviada com sucesso! Aguarde a análise do coordenador.")
             return redirect("estagio_detalhe", estagio_id=estagio.id)
         else:
             messages.error(request, "Por favor, corrija os erros no formulário.")
@@ -2688,12 +2697,11 @@ def validar_periodo_relatorio(data_inicio, data_fim):
 
 
 @login_required
+@aluno_required
 def listar_vagas_disponiveis(request):
     """
-    View para listar vagas disponíveis para vínculo.
-    TASK 22173 - [FRONT] Criar listagem de vagas disponíveis para vínculo
-    
-    CA4 - Somente vagas aprovadas e disponíveis devem aparecer
+    View para ALUNO listar vagas disponíveis para candidatura.
+    O aluno pode ver vagas aprovadas e disponíveis e se candidatar.
     """
     # Buscar vagas aprovadas e disponíveis
     vagas = Estagio.objects.filter(
@@ -2710,10 +2718,27 @@ def listar_vagas_disponiveis(request):
     if filtro_cargo:
         vagas = vagas.filter(cargo__icontains=filtro_cargo)
     
+    # Verifica se o aluno já tem estágio ativo
+    try:
+        usuario = Usuario.objects.get(id=request.user.id)
+        aluno = Aluno.objects.get(usuario=usuario)
+        tem_estagio_ativo = aluno.estagio is not None
+        
+        # Verifica se tem solicitação pendente
+        solicitacao_pendente = Estagio.objects.filter(
+            aluno_solicitante=aluno,
+            status='analise'
+        ).first()
+    except (Usuario.DoesNotExist, Aluno.DoesNotExist):
+        tem_estagio_ativo = False
+        solicitacao_pendente = None
+    
     context = {
         'vagas': vagas,
         'filtro_empresa': filtro_empresa,
         'filtro_cargo': filtro_cargo,
+        'tem_estagio_ativo': tem_estagio_ativo,
+        'solicitacao_pendente': solicitacao_pendente,
     }
     return render(request, 'estagio/listar_vagas_disponiveis.html', context)
 
@@ -2726,88 +2751,127 @@ def detalhe_vaga(request, estagio_id):
     """
     vaga = get_object_or_404(Estagio, id=estagio_id)
     
+    # Verifica se o aluno já tem estágio ou solicitação pendente
+    tem_estagio_ativo = False
+    solicitacao_pendente = None
+    try:
+        usuario = Usuario.objects.get(id=request.user.id)
+        aluno = Aluno.objects.get(usuario=usuario)
+        tem_estagio_ativo = aluno.estagio is not None
+        solicitacao_pendente = Estagio.objects.filter(
+            aluno_solicitante=aluno,
+            status='analise'
+        ).first()
+    except:
+        pass
+    
     context = {
         'vaga': vaga,
+        'tem_estagio_ativo': tem_estagio_ativo,
+        'solicitacao_pendente': solicitacao_pendente,
     }
     return render(request, 'estagio/detalhe_vaga.html', context)
 
 
 @login_required
-@require_POST
-def vincular_aluno_vaga(request, estagio_id):
+@aluno_required
+def candidatar_vaga(request, estagio_id):
     """
-    View para vincular um aluno a uma vaga disponível.
-    TASK 22174 - [FRONT] Implementar ação de vincular aluno à vaga
-    
-    CA7 - Atualiza status da vaga para ocupada
-    CA8 - Registra histórico do vínculo
+    View para ALUNO se candidatar a uma vaga existente.
+    O aluno envia o documento e a solicitação fica pendente de aprovação.
     """
-    from estagio.models import VinculoHistorico
-    
     vaga = get_object_or_404(Estagio, id=estagio_id)
     
     # Verificar se a vaga está disponível
     if not vaga.is_disponivel():
-        messages.error(request, 'Esta vaga não está mais disponível para vínculo.')
+        messages.error(request, 'Esta vaga não está mais disponível.')
         return redirect('listar_vagas_disponiveis')
-    
-    # Obter o aluno selecionado
-    aluno_id = request.POST.get('aluno_id')
-    if not aluno_id:
-        messages.error(request, 'Selecione um aluno para vincular.')
-        return redirect('detalhe_vaga', estagio_id=estagio_id)
-    
-    aluno = get_object_or_404(Aluno, id=aluno_id)
-    
-    # Verificar se o aluno já está vinculado a outro estágio
-    if aluno.estagio:
-        messages.error(request, f'O aluno {aluno.nome} já está vinculado a outro estágio.')
-        return redirect('detalhe_vaga', estagio_id=estagio_id)
     
     try:
-        # Realiza o vínculo
         usuario = Usuario.objects.get(id=request.user.id)
-        vaga.vincular_aluno(aluno, realizado_por=usuario)
-        
-        messages.success(
+        aluno = Aluno.objects.get(usuario=usuario)
+    except (Usuario.DoesNotExist, Aluno.DoesNotExist):
+        messages.error(request, "Erro: Aluno não encontrado.")
+        return redirect('listar_vagas_disponiveis')
+    
+    # Verificar se o aluno já tem estágio ativo
+    if aluno.estagio is not None:
+        messages.error(request, 'Você já está vinculado a um estágio.')
+        return redirect('acompanhar_estagios')
+    
+    # Verificar se já tem solicitação pendente
+    solicitacao_pendente = Estagio.objects.filter(
+        aluno_solicitante=aluno,
+        status='analise'
+    ).first()
+    
+    if solicitacao_pendente:
+        messages.warning(
             request, 
-            f'Aluno {aluno.nome} vinculado com sucesso à vaga "{vaga.titulo}"!'
+            f'Você já possui uma solicitação pendente para "{solicitacao_pendente.titulo}". '
+            'Aguarde a análise do coordenador.'
         )
         return redirect('listar_vagas_disponiveis')
+    
+    if request.method == 'POST':
+        documento_form = DocumentoForm(request.POST, request.FILES)
         
-    except Exception as e:
-        logger.error(f"Erro ao vincular aluno: {e}")
-        messages.error(request, 'Ocorreu um erro ao vincular o aluno. Tente novamente.')
-        return redirect('detalhe_vaga', estagio_id=estagio_id)
-
-
-@login_required
-def selecionar_aluno_vaga(request, estagio_id):
-    """
-    View para selecionar aluno para vincular a uma vaga.
-    TASK 22174 - Interface de seleção de aluno
-    """
-    vaga = get_object_or_404(Estagio, id=estagio_id)
-    
-    # Verificar se a vaga está disponível
-    if not vaga.is_disponivel():
-        messages.error(request, 'Esta vaga não está mais disponível para vínculo.')
-        return redirect('listar_vagas_disponiveis')
-    
-    # Buscar alunos sem vínculo
-    alunos_disponiveis = Aluno.objects.filter(estagio__isnull=True).order_by('nome')
-    
-    # Filtro por nome
-    filtro_nome = request.GET.get('nome', '')
-    if filtro_nome:
-        alunos_disponiveis = alunos_disponiveis.filter(nome__icontains=filtro_nome)
+        if documento_form.is_valid():
+            # Atualiza a vaga com o aluno solicitante
+            vaga.aluno_solicitante = aluno
+            vaga.status = 'analise'  # Muda para análise
+            vaga.save()
+            
+            # Recupera o coordenador selecionado
+            coordenador = documento_form.cleaned_data['coordenador']
+            
+            # Cria o documento
+            documento = documento_form.save(commit=False)
+            documento.data_envio = now().date()
+            documento.estagio = vaga
+            documento.supervisor = vaga.supervisor
+            documento.coordenador = coordenador
+            documento.versao = 1.0
+            documento.tipo = 'termo_compromisso'
+            documento.nome_arquivo = documento.arquivo.name if documento.arquivo else 'documento.pdf'
+            documento.enviado_por = usuario
+            documento.save()
+            
+            # Registrar no histórico
+            DocumentoHistorico.objects.create(
+                documento=documento,
+                acao='enviado',
+                usuario=usuario,
+                observacoes=f"Candidatura do aluno {aluno.nome} para a vaga {vaga.titulo}"
+            )
+            
+            # Notificar coordenador
+            try:
+                enviar_notificacao_email(
+                    destinatario=coordenador.usuario.email,
+                    assunto=f"Nova candidatura: {aluno.nome} para {vaga.titulo}",
+                    mensagem=f"O aluno {aluno.nome} se candidatou à vaga '{vaga.titulo}' "
+                             f"na empresa {vaga.empresa.razao_social}. Por favor, analise a solicitação."
+                )
+            except Exception as e:
+                logger.error(f"Erro ao enviar notificação: {e}")
+            
+            messages.success(
+                request, 
+                f'Candidatura enviada com sucesso! Aguarde a análise do coordenador.'
+            )
+            return redirect('historico_solicitacoes')
+        else:
+            messages.error(request, "Por favor, corrija os erros no formulário.")
+    else:
+        documento_form = DocumentoForm()
     
     context = {
         'vaga': vaga,
-        'alunos': alunos_disponiveis,
-        'filtro_nome': filtro_nome,
+        'documento_form': documento_form,
+        'aluno': aluno,
     }
-    return render(request, 'estagio/selecionar_aluno_vaga.html', context)
+    return render(request, 'estagio/candidatar_vaga.html', context)
 
 
 # ==================== VIEWS DE ATIVIDADES ====================

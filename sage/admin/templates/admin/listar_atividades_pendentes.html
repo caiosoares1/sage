@@ -1,0 +1,149 @@
+{% extends 'base.html' %}
+
+{% block title %}Atividades Pendentes - Sistema de Gestão de Estágios{% endblock %}
+
+{% block nav_supervisor_atividades %}active{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2><i class="fas fa-tasks"></i> Atividades dos Estagiários</h2>
+    <p>Confirme ou rejeite as atividades realizadas pelos seus estagiários</p>
+</div>
+
+<!-- Estatísticas -->
+<div class="stats-cards">
+    <div class="stat-card stat-warning">
+        <div class="stat-icon"><i class="fas fa-clock"></i></div>
+        <div class="stat-info">
+            <span class="stat-value">{{ stats.pendentes }}</span>
+            <span class="stat-label">Pendentes</span>
+        </div>
+    </div>
+    <div class="stat-card stat-success">
+        <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
+        <div class="stat-info">
+            <span class="stat-value">{{ stats.confirmadas }}</span>
+            <span class="stat-label">Confirmadas</span>
+        </div>
+    </div>
+    <div class="stat-card stat-danger">
+        <div class="stat-icon"><i class="fas fa-times-circle"></i></div>
+        <div class="stat-info">
+            <span class="stat-value">{{ stats.rejeitadas }}</span>
+            <span class="stat-label">Rejeitadas</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon"><i class="fas fa-list"></i></div>
+        <div class="stat-info">
+            <span class="stat-value">{{ stats.total }}</span>
+            <span class="stat-label">Total</span>
+        </div>
+    </div>
+</div>
+
+<!-- Filtros -->
+<div class="filters-section">
+    <form method="get" class="filter-form">
+        <div class="filter-group">
+            <label for="status">Status:</label>
+            <select name="status" id="status" class="form-control">
+                <option value="">Todos</option>
+                <option value="pendente" {% if status_filtro == 'pendente' %}selected{% endif %}>Pendente</option>
+                <option value="confirmada" {% if status_filtro == 'confirmada' %}selected{% endif %}>Confirmada</option>
+                <option value="rejeitada" {% if status_filtro == 'rejeitada' %}selected{% endif %}>Rejeitada</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label for="aluno">Aluno:</label>
+            <input type="text" name="aluno" id="aluno" value="{{ aluno_filtro }}" 
+                   class="form-control" placeholder="Nome do aluno">
+        </div>
+        <button type="submit" class="btn btn-primary">
+            <i class="fas fa-search"></i> Filtrar
+        </button>
+        {% if status_filtro or aluno_filtro %}
+        <a href="{% url 'supervisor:atividades_pendentes' %}" class="btn btn-secondary">
+            <i class="fas fa-times"></i> Limpar
+        </a>
+        {% endif %}
+    </form>
+</div>
+
+<!-- Lista de Atividades -->
+<div class="table-container">
+    <h3><i class="fas fa-list"></i> Atividades</h3>
+    
+    {% if atividades %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Data</th>
+                <th>Aluno</th>
+                <th>Descrição</th>
+                <th>Horas</th>
+                <th>Status</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for atividade in atividades %}
+            <tr>
+                <td>{{ atividade.data_realizacao|date:"d/m/Y" }}</td>
+                <td>{{ atividade.aluno.nome }}</td>
+                <td>
+                    <div class="descricao-truncada" title="{{ atividade.descricao }}">
+                        {{ atividade.descricao|truncatechars:50 }}
+                    </div>
+                </td>
+                <td>{{ atividade.horas|floatformat:1 }}h</td>
+                <td>
+                    {% if atividade.status == 'pendente' %}
+                        <span class="status-badge status-warning">Pendente</span>
+                    {% elif atividade.status == 'confirmada' %}
+                        <span class="status-badge status-success">Confirmada</span>
+                    {% elif atividade.status == 'rejeitada' %}
+                        <span class="status-badge status-danger">Rejeitada</span>
+                    {% endif %}
+                </td>
+                <td class="actions">
+                    <a href="{% url 'supervisor:visualizar_atividade' atividade.id %}" 
+                       class="btn btn-sm btn-info" title="Visualizar">
+                        <i class="fas fa-eye"></i>
+                    </a>
+                    {% if atividade.status == 'pendente' %}
+                    <a href="{% url 'supervisor:confirmar_atividade' atividade.id %}" 
+                       class="btn btn-sm btn-success" title="Confirmar">
+                        <i class="fas fa-check"></i>
+                    </a>
+                    <a href="{% url 'supervisor:rejeitar_atividade' atividade.id %}" 
+                       class="btn btn-sm btn-danger" title="Rejeitar">
+                        <i class="fas fa-times"></i>
+                    </a>
+                    {% endif %}
+                    <a href="{% url 'supervisor:historico_atividade' atividade.id %}" 
+                       class="btn btn-sm btn-secondary" title="Histórico">
+                        <i class="fas fa-history"></i>
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+        <i class="fas fa-check-circle"></i>
+        <p>Nenhuma atividade encontrada com os filtros selecionados.</p>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.descricao-truncada {
+    max-width: 300px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+</style>
+{% endblock %}

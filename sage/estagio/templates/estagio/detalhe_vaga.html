@@ -8,9 +8,15 @@
         <h2><i class="fas fa-briefcase"></i> {{ vaga.titulo }}</h2>
         <div class="header-actions">
             {% if vaga.is_disponivel %}
-            <a href="{% url 'selecionar_aluno_vaga' vaga.id %}" class="btn btn-primary">
-                <i class="fas fa-link"></i> Vincular Aluno
-            </a>
+                {% if not tem_estagio_ativo and not solicitacao_pendente %}
+                <a href="{% url 'candidatar_vaga' vaga.id %}" class="btn btn-success">
+                    <i class="fas fa-paper-plane"></i> Candidatar-se
+                </a>
+                {% elif solicitacao_pendente %}
+                <span class="badge badge-warning p-2">
+                    <i class="fas fa-clock"></i> Candidatura pendente
+                </span>
+                {% endif %}
             {% endif %}
             <a href="{% url 'listar_vagas_disponiveis' %}" class="btn btn-secondary">
                 <i class="fas fa-arrow-left"></i> Voltar

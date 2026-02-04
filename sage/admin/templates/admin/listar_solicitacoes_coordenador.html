@@ -1,0 +1,150 @@
+{% extends 'base.html' %}
+
+{% block title %}Solicitações de Estágio - Sistema de Gestão de Estágios{% endblock %}
+
+{% block nav_coordenador_solicitacoes %}active{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2><i class="fas fa-clipboard-list"></i> Solicitações de Estágio</h2>
+    <p>Gerencie as solicitações de estágio dos alunos da sua instituição: <strong>{{ coordenador.instituicao.nome }}</strong></p>
+</div>
+
+<!-- Estatísticas -->
+<div class="stats-cards">
+    <div class="stat-card stat-warning">
+        <div class="stat-icon"><i class="fas fa-clock"></i></div>
+        <div class="stat-info">
+            <span class="stat-value">{{ stats.em_analise }}</span>
+            <span class="stat-label">Em Análise</span>
+        </div>
+    </div>
+    <div class="stat-card stat-success">
+        <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
+        <div class="stat-info">
+            <span class="stat-value">{{ stats.aprovados }}</span>
+            <span class="stat-label">Aprovados</span>
+        </div>
+    </div>
+    <div class="stat-card stat-danger">
+        <div class="stat-icon"><i class="fas fa-times-circle"></i></div>
+        <div class="stat-info">
+            <span class="stat-value">{{ stats.reprovados }}</span>
+            <span class="stat-label">Reprovados</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon"><i class="fas fa-list"></i></div>
+        <div class="stat-info">
+            <span class="stat-value">{{ stats.total }}</span>
+            <span class="stat-label">Total</span>
+        </div>
+    </div>
+</div>
+
+<!-- Filtros -->
+<div class="filters-section">
+    <form method="get" class="filter-form">
+        <div class="filter-group">
+            <label for="status">Status:</label>
+            <select name="status" id="status" class="form-control">
+                <option value="">Todos</option>
+                <option value="analise" {% if filtro_status == 'analise' %}selected{% endif %}>Em Análise</option>
+                <option value="aprovado" {% if filtro_status == 'aprovado' %}selected{% endif %}>Aprovado</option>
+                <option value="reprovado" {% if filtro_status == 'reprovado' %}selected{% endif %}>Reprovado</option>
+                <option value="em_andamento" {% if filtro_status == 'em_andamento' %}selected{% endif %}>Em Andamento</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label for="aluno">Aluno:</label>
+            <input type="text" name="aluno" id="aluno" value="{{ filtro_aluno }}" 
+                   class="form-control" placeholder="Nome do aluno">
+        </div>
+        <button type="submit" class="btn btn-primary">
+            <i class="fas fa-search"></i> Filtrar
+        </button>
+        {% if filtro_status or filtro_aluno %}
+        <a href="{% url 'coordenador:listar_solicitacoes_coordenador' %}" class="btn btn-secondary">
+            <i class="fas fa-times"></i> Limpar
+        </a>
+        {% endif %}
+    </form>
+</div>
+
+<!-- Lista de Solicitações -->
+<div class="table-container">
+    <h3><i class="fas fa-list"></i> Solicitações de Estágio</h3>
+    
+    {% if estagios %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Data</th>
+                <th>Aluno</th>
+                <th>Título</th>
+                <th>Empresa</th>
+                <th>Status</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for estagio in estagios %}
+            <tr>
+                <td>{{ estagio.data_solicitacao|date:"d/m/Y" }}</td>
+                <td>
+                    {% if estagio.aluno_solicitante %}
+                        {{ estagio.aluno_solicitante.nome }}
+                    {% else %}
+                        <span class="text-muted">-</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <strong>{{ estagio.titulo }}</strong>
+                    <br><small class="text-muted">{{ estagio.cargo }}</small>
+                </td>
+                <td>{{ estagio.empresa.razao_social }}</td>
+                <td>
+                    {% if estagio.status == 'analise' %}
+                        <span class="status-badge status-warning">Em Análise</span>
+                    {% elif estagio.status == 'aprovado' %}
+                        <span class="status-badge status-success">Aprovado</span>
+                    {% elif estagio.status == 'reprovado' %}
+                        <span class="status-badge status-danger">Reprovado</span>
+                    {% elif estagio.status == 'em_andamento' %}
+                        <span class="status-badge status-info">Em Andamento</span>
+                    {% endif %}
+                </td>
+                <td class="actions">
+                    <a href="{% url 'estagio_detalhe' estagio.id %}" 
+                       class="btn btn-sm btn-info" title="Visualizar">
+                        <i class="fas fa-eye"></i>
+                    </a>
+                    {% if estagio.status == 'analise' %}
+                    <form action="{% url 'coordenador:aprovar_estagio' estagio.id %}" method="post" style="display: inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-success" title="Aprovar"
+                                onclick="return confirm('Confirma a aprovação deste estágio?');">
+                            <i class="fas fa-check"></i>
+                        </button>
+                    </form>
+                    <form action="{% url 'coordenador:reprovar_estagio' estagio.id %}" method="post" style="display: inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-danger" title="Reprovar"
+                                onclick="return confirm('Confirma a reprovação deste estágio?');">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+        <i class="fas fa-clipboard-check"></i>
+        <p>Nenhuma solicitação encontrada com os filtros selecionados.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

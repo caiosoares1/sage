@@ -61,23 +61,29 @@
                 
                 <!-- Menu para Aluno -->
                 {% if user.aluno %}
+                    <a href="{% url 'listar_vagas_disponiveis' %}" class="nav-item {% block nav_vagas %}{% endblock %}">
+                        <i class="fas fa-briefcase"></i> Vagas Disponíveis
+                    </a>
                     <a href="{% url 'acompanhar_estagios' %}" class="nav-item {% block nav_estagios %}{% endblock %}">
-                        <i class="fas fa-briefcase"></i> Meus Estágios
+                        <i class="fas fa-clipboard-list"></i> Meus Estágios
                     </a>
                     <a href="{% url 'historico_solicitacoes' %}" class="nav-item {% block nav_historico %}{% endblock %}">
-                        <i class="fas fa-history"></i> Histórico de Solicitações
+                        <i class="fas fa-history"></i> Histórico
                     </a>
                     <a href="{% url 'solicitar_estagio' %}" class="nav-item {% block nav_solicitar %}{% endblock %}">
                         <i class="fas fa-plus-circle"></i> Solicitar Estágio
                     </a>
                     <a href="{% url 'listar_documentos' %}" class="nav-item {% block nav_documentos %}{% endblock %}">
-                        <i class="fas fa-file-alt"></i> Meus Documentos
+                        <i class="fas fa-file-alt"></i> Documentos
                     </a>
                     <a href="{% url 'consultar_horas' %}" class="nav-item {% block nav_horas %}{% endblock %}">
-                        <i class="fas fa-clock"></i> Minhas Horas
+                        <i class="fas fa-clock"></i> Horas
                     </a>
                     <a href="{% url 'listar_feedbacks' %}" class="nav-item {% block nav_feedbacks %}{% endblock %}">
                         <i class="fas fa-comments"></i> Feedbacks
+                    </a>
+                    <a href="{% url 'listar_pareceres_aluno' %}" class="nav-item {% block nav_pareceres %}{% endblock %}">
+                        <i class="fas fa-clipboard-check"></i> Pareceres
                     </a>
                     <a href="{% url 'listar_notificacoes' %}" class="nav-item nav-notificacoes {% block nav_notificacoes %}{% endblock %}" id="nav-notificacoes-link">
                         <i class="fas fa-bell"></i> Notificações
@@ -90,21 +96,45 @@
                 
                 <!-- Menu para Supervisor -->
                 {% if user.supervisor %}
-                    <a href="{% url 'supervisor:documentos' %}" class="nav-item {% block nav_supervisor %}{% endblock %}">
-                        <i class="fas fa-tasks"></i> Aprovar Documentos
+                    <a href="{% url 'supervisor:documentos' %}" class="nav-item {% block nav_supervisor_documentos %}{% endblock %}">
+                        <i class="fas fa-file-signature"></i> Documentos
+                    </a>
+                    <a href="{% url 'supervisor:atividades_pendentes' %}" class="nav-item {% block nav_supervisor_atividades %}{% endblock %}">
+                        <i class="fas fa-tasks"></i> Atividades
+                    </a>
+                    <a href="{% url 'supervisor:listar_avaliacoes' %}" class="nav-item {% block nav_supervisor_avaliacoes %}{% endblock %}">
+                        <i class="fas fa-star"></i> Avaliações
                     </a>
                     <a href="{% url 'supervisor_ver_horas' %}" class="nav-item {% block nav_supervisor_horas %}{% endblock %}">
-                        <i class="fas fa-user-clock"></i> Horas dos Alunos
+                        <i class="fas fa-user-clock"></i> Horas
                     </a>
                     <a href="{% url 'enviar_feedback_aluno' %}" class="nav-item {% block nav_enviar_feedback %}{% endblock %}">
-                        <i class="fas fa-comment-medical"></i> Enviar Feedback
+                        <i class="fas fa-comment-medical"></i> Feedback
                     </a>
                 {% endif %}
                 
                 <!-- Menu para Coordenador -->
                 {% if user.cursocoordenador %}
-                    <a href="{% url 'coordenador:documentos' %}" class="nav-item {% block nav_coordenador %}{% endblock %}">
-                        <i class="fas fa-check-double"></i> Aprovação Final
+                    <a href="{% url 'coordenador:listar_solicitacoes_coordenador' %}" class="nav-item {% block nav_coordenador_solicitacoes %}{% endblock %}">
+                        <i class="fas fa-clipboard-list"></i> Solicitações
+                    </a>
+                    <a href="{% url 'coordenador:documentos' %}" class="nav-item {% block nav_coordenador_documentos %}{% endblock %}">
+                        <i class="fas fa-check-double"></i> Aprovar Docs
+                    </a>
+                    <a href="{% url 'coordenador:listar_vagas_disponiveis' %}" class="nav-item {% block nav_coordenador_vagas %}{% endblock %}">
+                        <i class="fas fa-briefcase"></i> Vagas
+                    </a>
+                    <a href="{% url 'coordenador:listar_vinculos' %}" class="nav-item {% block nav_coordenador_vinculos %}{% endblock %}">
+                        <i class="fas fa-link"></i> Vínculos
+                    </a>
+                    <a href="{% url 'painel_estagios' %}" class="nav-item {% block nav_painel_estagios %}{% endblock %}">
+                        <i class="fas fa-chart-bar"></i> Painel
+                    </a>
+                    <a href="{% url 'monitoramento_pendencias' %}" class="nav-item {% block nav_monitoramento %}{% endblock %}">
+                        <i class="fas fa-exclamation-triangle"></i> Pendências
+                    </a>
+                    <a href="{% url 'gerar_relatorio_estagios' %}" class="nav-item {% block nav_relatorios %}{% endblock %}">
+                        <i class="fas fa-file-export"></i> Relatórios
                     </a>
                 {% endif %}
                 
