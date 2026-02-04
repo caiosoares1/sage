@@ -126,7 +126,7 @@
                 </div>
 
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-primary btn-lg">
+                    <button type="submit" id="submitBtn" class="btn btn-primary btn-lg" disabled>
                         <i class="fas fa-save"></i> Registrar Horas
                     </button>
                     <a href="{% url 'consultar_horas' %}" class="btn btn-secondary">
@@ -361,9 +361,15 @@
     color: white;
 }
 
-.btn-primary:hover {
+.btn-primary:hover:not(:disabled) {
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+}
+
+.btn-primary:disabled {
+    background: linear-gradient(135deg, #9CA3AF 0%, #6B7280 100%);
+    cursor: not-allowed;
+    opacity: 0.6;
 }
 
 .btn-secondary {
@@ -385,4 +391,45 @@
     border: 1px solid #FECACA;
 }
 </style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const submitBtn = document.getElementById('submitBtn');
+    
+    // Campos obrigatórios
+    const requiredFields = [
+        document.getElementById('id_data'),
+        document.getElementById('id_quantidade'),
+        document.getElementById('id_descricao')
+    ].filter(field => field !== null);
+    
+    function validateForm() {
+        let allFilled = true;
+        
+        for (let field of requiredFields) {
+            if (!field.value.trim()) {
+                allFilled = false;
+                break;
+            }
+        }
+        
+        // Validação adicional: quantidade deve ser maior que 0
+        const quantidadeField = document.getElementById('id_quantidade');
+        if (quantidadeField && (parseInt(quantidadeField.value) <= 0 || isNaN(parseInt(quantidadeField.value)))) {
+            allFilled = false;
+        }
+        
+        submitBtn.disabled = !allFilled;
+    }
+    
+    // Adiciona listeners para detectar mudanças
+    requiredFields.forEach(field => {
+        field.addEventListener('input', validateForm);
+        field.addEventListener('change', validateForm);
+    });
+    
+    // Valida no carregamento
+    validateForm();
+});
+</script>
 {% endblock %}

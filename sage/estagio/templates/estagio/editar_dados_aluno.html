@@ -120,7 +120,7 @@
                 </div>
 
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-primary btn-lg">
+                    <button type="submit" id="submitBtn" class="btn btn-primary btn-lg" disabled>
                         <i class="fas fa-save"></i> Salvar Alterações
                     </button>
                     <a href="{% url 'dashboard' %}" class="btn btn-secondary">
@@ -337,9 +337,15 @@
     color: white;
 }
 
-.btn-primary:hover {
+.btn-primary:hover:not(:disabled) {
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+}
+
+.btn-primary:disabled {
+    background: linear-gradient(135deg, #9CA3AF 0%, #6B7280 100%);
+    cursor: not-allowed;
+    opacity: 0.6;
 }
 
 .btn-secondary {
@@ -366,4 +372,43 @@
     border: 1px solid #BFDBFE;
 }
 </style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const submitBtn = document.getElementById('submitBtn');
+    const form = submitBtn.closest('form');
+    
+    // Campos editáveis (exclui matrícula que é readonly)
+    const editableFields = [
+        document.getElementById('id_nome'),
+        document.getElementById('id_contato'),
+        document.getElementById('id_instituicao')
+    ].filter(field => field !== null);
+    
+    // Armazena os valores iniciais
+    const initialValues = {};
+    editableFields.forEach(field => {
+        initialValues[field.id] = field.value;
+    });
+    
+    function checkForChanges() {
+        let hasChanges = false;
+        
+        for (let field of editableFields) {
+            if (field.value !== initialValues[field.id]) {
+                hasChanges = true;
+                break;
+            }
+        }
+        
+        submitBtn.disabled = !hasChanges;
+    }
+    
+    // Adiciona listeners para detectar mudanças
+    editableFields.forEach(field => {
+        field.addEventListener('input', checkForChanges);
+        field.addEventListener('change', checkForChanges);
+    });
+});
+</script>
 {% endblock %}

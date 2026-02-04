@@ -34,7 +34,13 @@
     {% if notificacoes %}
     <div class="notifications-list">
         {% for notificacao in notificacoes %}
-        <div class="notification-card {% if 'prazo' in notificacao.assunto|lower or 'alerta' in notificacao.assunto|lower %}notification-urgent{% elif 'aprovado' in notificacao.assunto|lower %}notification-success{% elif 'reprovado' in notificacao.assunto|lower or 'ajustes' in notificacao.assunto|lower %}notification-warning{% endif %}">
+        <div class="notification-card {% if 'prazo' in notificacao.assunto|lower or 'alerta' in notificacao.assunto|lower %}notification-urgent{% elif 'aprovado' in notificacao.assunto|lower %}notification-success{% elif 'reprovado' in notificacao.assunto|lower or 'ajustes' in notificacao.assunto|lower %}notification-warning{% endif %}" 
+             onclick="openNotificationModal(this)"
+             data-assunto="{{ notificacao.assunto }}"
+             data-mensagem="{{ notificacao.mensagem }}"
+             data-data="{{ notificacao.data_envio|date:'d/m/Y H:i' }}"
+             data-referencia="{{ notificacao.referencia|default:'' }}"
+             style="cursor: pointer;">
             <div class="notification-icon">
                 {% if 'prazo' in notificacao.assunto|lower or 'alerta' in notificacao.assunto|lower %}
                     <i class="fas fa-exclamation-triangle"></i>
@@ -376,5 +382,224 @@
         align-self: flex-end;
     }
 }
+
+/* Modal Styles */
+.modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+    padding: 1rem;
+}
+
+.modal-overlay.active {
+    display: flex;
+}
+
+.modal-content {
+    background: var(--white);
+    border-radius: 16px;
+    max-width: 600px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    animation: modalSlideIn 0.3s ease;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 1.5rem;
+    border-bottom: 1px solid #E5E7EB;
+    background: linear-gradient(135deg, var(--primary-color) 0%, #5a67d8 100%);
+    border-radius: 16px 16px 0 0;
+    color: white;
+}
+
+.modal-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.modal-close {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.25rem;
+    transition: all 0.3s ease;
+}
+
+.modal-close:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.modal-body {
+    padding: 1.5rem;
+}
+
+.modal-date {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-gray);
+    font-size: 0.875rem;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #E5E7EB;
+}
+
+.modal-message {
+    color: var(--text-dark);
+    font-size: 1rem;
+    line-height: 1.75;
+    white-space: pre-wrap;
+}
+
+.modal-reference {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid #E5E7EB;
+}
+
+.modal-reference-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background-color: #EEF2FF;
+    color: var(--primary-color);
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.modal-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid #E5E7EB;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.btn-modal-close {
+    padding: 0.75rem 1.5rem;
+    background-color: #F3F4F6;
+    color: var(--text-gray);
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-modal-close:hover {
+    background-color: #E5E7EB;
+}
 </style>
+
+<!-- Modal de Detalhes da Notificação -->
+<div id="notificationModal" class="modal-overlay" onclick="closeModalOnOverlay(event)">
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <h3><i class="fas fa-bell"></i> <span id="modalTitle"></span></h3>
+            <button class="modal-close" onclick="closeNotificationModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <div class="modal-date">
+                <i class="fas fa-calendar-alt"></i>
+                <span id="modalDate"></span>
+            </div>
+            <div class="modal-message" id="modalMessage"></div>
+            <div class="modal-reference" id="modalReferenceContainer" style="display: none;">
+                <span class="modal-reference-badge">
+                    <i class="fas fa-file-alt"></i>
+                    <span id="modalReference"></span>
+                </span>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-modal-close" onclick="closeNotificationModal()">
+                <i class="fas fa-times"></i> Fechar
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+function openNotificationModal(element) {
+    // Evita abrir modal ao clicar no botão de marcar como lida
+    if (event.target.closest('.notification-actions')) {
+        return;
+    }
+    
+    const assunto = element.dataset.assunto;
+    const mensagem = element.dataset.mensagem;
+    const data = element.dataset.data;
+    const referencia = element.dataset.referencia;
+    
+    document.getElementById('modalTitle').textContent = assunto;
+    document.getElementById('modalDate').textContent = data;
+    document.getElementById('modalMessage').textContent = mensagem;
+    
+    const refContainer = document.getElementById('modalReferenceContainer');
+    if (referencia) {
+        document.getElementById('modalReference').textContent = referencia;
+        refContainer.style.display = 'block';
+    } else {
+        refContainer.style.display = 'none';
+    }
+    
+    document.getElementById('notificationModal').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeNotificationModal() {
+    document.getElementById('notificationModal').classList.remove('active');
+    document.body.style.overflow = '';
+}
+
+function closeModalOnOverlay(event) {
+    if (event.target === event.currentTarget) {
+        closeNotificationModal();
+    }
+}
+
+// Fecha o modal com a tecla ESC
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        closeNotificationModal();
+    }
+});
+</script>
 {% endblock %}

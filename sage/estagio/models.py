@@ -199,7 +199,7 @@ class Avaliacao(models.Model):
     aluno = models.ForeignKey('Aluno', on_delete=models.CASCADE, related_name='avaliacoes', null=True, blank=True)
     
     # Campos de auditoria
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

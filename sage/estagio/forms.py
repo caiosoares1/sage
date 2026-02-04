@@ -153,7 +153,10 @@ class AlunoCadastroForm(forms.ModelForm):
             raise forms.ValidationError('O campo Matrícula é obrigatório.')
         if not matricula.isdigit():
             raise forms.ValidationError('A matrícula deve conter apenas números.')
-        if Aluno.objects.filter(matricula=matricula).exists():
+        qs = Aluno.objects.filter(matricula=matricula)
+        if self.instance and self.instance.pk:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
             raise forms.ValidationError('Esta matrícula já está cadastrada.')
         return matricula
 
