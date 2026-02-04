@@ -1,0 +1,176 @@
+{% extends 'base.html' %}
+
+{% block title %}Meus Pareceres - Sistema de Gestão de Estágios{% endblock %}
+
+{% block nav_pareceres %}active{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2><i class="fas fa-clipboard-check"></i> Meus Pareceres</h2>
+    <p>Consulte os pareceres das suas avaliações de estágio</p>
+</div>
+
+<!-- Estatísticas -->
+<div class="stats-cards">
+    <div class="stat-card">
+        <div class="stat-icon"><i class="fas fa-file-alt"></i></div>
+        <div class="stat-info">
+            <span class="stat-value">{{ total_pareceres }}</span>
+            <span class="stat-label">Pareceres Disponíveis</span>
+        </div>
+    </div>
+    {% if media_notas %}
+    <div class="stat-card stat-success">
+        <div class="stat-icon"><i class="fas fa-star"></i></div>
+        <div class="stat-info">
+            <span class="stat-value">{{ media_notas|floatformat:1 }}</span>
+            <span class="stat-label">Média das Notas</span>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Lista de Pareceres -->
+<div class="table-container">
+    <h3><i class="fas fa-list"></i> Pareceres Recebidos</h3>
+    
+    {% if avaliacoes %}
+    <div class="pareceres-grid">
+        {% for avaliacao in avaliacoes %}
+        <div class="parecer-card">
+            <div class="parecer-header">
+                <div class="parecer-empresa">
+                    <i class="fas fa-building"></i>
+                    {{ avaliacao.estagio.empresa.razao_social }}
+                </div>
+                <div class="parecer-data">
+                    <i class="fas fa-calendar"></i>
+                    {{ avaliacao.data_emissao_parecer|date:"d/m/Y" }}
+                </div>
+            </div>
+            <div class="parecer-body">
+                <div class="parecer-supervisor">
+                    <small>Supervisor:</small>
+                    <strong>{{ avaliacao.supervisor.nome }}</strong>
+                </div>
+                <div class="parecer-nota">
+                    {% if avaliacao.nota_final %}
+                    <div class="nota-badge {% if avaliacao.nota_final >= 7 %}nota-aprovado{% elif avaliacao.nota_final >= 5 %}nota-regular{% else %}nota-reprovado{% endif %}">
+                        <span class="nota-valor">{{ avaliacao.nota_final|floatformat:1 }}</span>
+                        <span class="nota-label">Nota Final</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="parecer-footer">
+                <a href="{% url 'consultar_parecer' avaliacao.id %}" class="btn btn-primary">
+                    <i class="fas fa-eye"></i> Ver Parecer Completo
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <i class="fas fa-clipboard-check"></i>
+        <p>Você ainda não possui pareceres disponíveis.</p>
+        <p class="text-muted">Os pareceres serão exibidos aqui após serem emitidos pelo seu supervisor.</p>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.pareceres-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1rem;
+}
+
+.parecer-card {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.parecer-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+}
+
+.parecer-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff;
+    padding: 1rem 1.25rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.parecer-empresa {
+    font-weight: 600;
+}
+
+.parecer-data {
+    font-size: 0.875rem;
+    opacity: 0.9;
+}
+
+.parecer-body {
+    padding: 1.25rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.parecer-supervisor small {
+    display: block;
+    color: #6c757d;
+    margin-bottom: 0.25rem;
+}
+
+.nota-badge {
+    text-align: center;
+    padding: 0.75rem 1.25rem;
+    border-radius: 8px;
+}
+
+.nota-aprovado {
+    background: #d4edda;
+    color: #155724;
+}
+
+.nota-regular {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.nota-reprovado {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.nota-valor {
+    display: block;
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.nota-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+}
+
+.parecer-footer {
+    padding: 1rem 1.25rem;
+    background: #f8f9fa;
+    border-top: 1px solid #e9ecef;
+}
+
+.parecer-footer .btn {
+    width: 100%;
+}
+</style>
+{% endblock %}

@@ -1,0 +1,131 @@
+{% extends 'base.html' %}
+
+{% block title %}Vincular Aluno à Vaga - Sistema de Gestão de Estágios{% endblock %}
+
+{% block nav_coordenador_vagas %}active{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2><i class="fas fa-link"></i> Vincular Aluno à Vaga</h2>
+    <p>Associe um aluno da sua instituição a uma vaga de estágio disponível</p>
+</div>
+
+<div class="info-box">
+    <i class="fas fa-info-circle"></i>
+    <div>
+        <strong>Instituição:</strong> {{ coordenador.instituicao.nome }}<br>
+        <small>Apenas alunos desta instituição são exibidos.</small>
+    </div>
+</div>
+
+<div class="form-container">
+    <form method="post" class="form-card">
+        {% csrf_token %}
+        
+        <div class="form-group">
+            <label for="id_aluno" class="form-label">
+                <i class="fas fa-user-graduate"></i> Aluno
+            </label>
+            {{ form.aluno }}
+            {% if form.aluno.errors %}
+                <div class="error-message">{{ form.aluno.errors.0 }}</div>
+            {% endif %}
+            <small class="form-help">Alunos sem vínculo ativo da sua instituição</small>
+        </div>
+        
+        <div class="form-group">
+            <label for="id_vaga" class="form-label">
+                <i class="fas fa-briefcase"></i> Vaga de Estágio
+            </label>
+            {{ form.vaga }}
+            {% if form.vaga.errors %}
+                <div class="error-message">{{ form.vaga.errors.0 }}</div>
+            {% endif %}
+            <small class="form-help">Vagas aprovadas e disponíveis</small>
+        </div>
+        
+        <div class="form-group">
+            <label for="id_observacoes" class="form-label">
+                <i class="fas fa-comment"></i> Observações
+            </label>
+            {{ form.observacoes }}
+            <small class="form-help">Observações adicionais sobre o vínculo (opcional)</small>
+        </div>
+        
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-link"></i> Realizar Vínculo
+            </button>
+            <a href="{% url 'coordenador:listar_vagas_disponiveis' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Voltar
+            </a>
+        </div>
+    </form>
+</div>
+
+<style>
+.info-box {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    background: #e3f2fd;
+    border: 1px solid #90caf9;
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.5rem;
+}
+
+.info-box i {
+    font-size: 1.5rem;
+    color: #1976d2;
+}
+
+.form-container {
+    max-width: 600px;
+}
+
+.form-card {
+    background: #fff;
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: #333;
+}
+
+.form-label i {
+    margin-right: 0.5rem;
+    color: #667eea;
+}
+
+.form-help {
+    display: block;
+    margin-top: 0.25rem;
+    color: #6c757d;
+    font-size: 0.875rem;
+}
+
+.error-message {
+    color: #dc3545;
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+}
+
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid #e9ecef;
+}
+</style>
+{% endblock %}

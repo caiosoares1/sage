@@ -1,0 +1,193 @@
+{% extends 'base.html' %}
+
+{% block title %}Candidatar-se à Vaga - Sistema de Gestão de Estágios{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h2><i class="fas fa-paper-plane"></i> Candidatar-se à Vaga</h2>
+        <p class="subtitle">Envie sua candidatura para a vaga selecionada</p>
+    </div>
+
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Informações da Vaga -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h4><i class="fas fa-briefcase"></i> Detalhes da Vaga</h4>
+        </div>
+        <div class="card-body">
+            <div class="vaga-info-grid">
+                <div class="info-group">
+                    <label>Título</label>
+                    <p>{{ vaga.titulo }}</p>
+                </div>
+                <div class="info-group">
+                    <label>Empresa</label>
+                    <p>{{ vaga.empresa.razao_social }}</p>
+                </div>
+                <div class="info-group">
+                    <label>Cargo</label>
+                    <p>{{ vaga.cargo }}</p>
+                </div>
+                <div class="info-group">
+                    <label>Carga Horária</label>
+                    <p>{{ vaga.carga_horaria }}h/semana</p>
+                </div>
+                <div class="info-group">
+                    <label>Período</label>
+                    <p>{{ vaga.data_inicio|date:"d/m/Y" }} a {{ vaga.data_fim|date:"d/m/Y" }}</p>
+                </div>
+                {% if vaga.supervisor %}
+                <div class="info-group">
+                    <label>Supervisor</label>
+                    <p>{{ vaga.supervisor.nome }}</p>
+                </div>
+                {% endif %}
+            </div>
+            {% if vaga.descricao %}
+            <div class="info-group full-width mt-3">
+                <label>Descrição</label>
+                <p>{{ vaga.descricao }}</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Formulário de Candidatura -->
+    <div class="card">
+        <div class="card-header">
+            <h4><i class="fas fa-file-upload"></i> Enviar Documentação</h4>
+        </div>
+        <div class="card-body">
+            <form method="post" enctype="multipart/form-data" class="candidatura-form">
+                {% csrf_token %}
+                
+                <div class="alert alert-info-custom mb-4">
+                    <i class="fas fa-info-circle"></i>
+                    <div>
+                        <strong>{{ aluno.nome }}</strong><br>
+                        <small>Matrícula: {{ aluno.matricula }}</small>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="id_coordenador">Coordenador Responsável <span class="required">*</span></label>
+                    {{ documento_form.coordenador }}
+                    {% if documento_form.coordenador.errors %}
+                    <div class="invalid-feedback">{{ documento_form.coordenador.errors }}</div>
+                    {% endif %}
+                    <small class="form-text text-muted">Selecione o coordenador que analisará sua candidatura.</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="id_arquivo">Termo de Compromisso <span class="required">*</span></label>
+                    {{ documento_form.arquivo }}
+                    {% if documento_form.arquivo.errors %}
+                    <div class="invalid-feedback">{{ documento_form.arquivo.errors }}</div>
+                    {% endif %}
+                    <small class="form-text text-muted">Envie o Termo de Compromisso de Estágio assinado (PDF, máx 10MB).</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="id_observacoes">Observações</label>
+                    {{ documento_form.observacoes }}
+                    <small class="form-text text-muted">Informações adicionais para o coordenador (opcional).</small>
+                </div>
+
+                <div class="form-actions">
+                    <a href="{% url 'listar_vagas_disponiveis' %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Voltar
+                    </a>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-paper-plane"></i> Enviar Candidatura
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+.vaga-info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.info-group label {
+    font-weight: 600;
+    color: #555;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    margin-bottom: 0.25rem;
+    display: block;
+}
+
+.info-group p {
+    margin: 0;
+    color: #333;
+}
+
+.info-group.full-width {
+    grid-column: 1 / -1;
+}
+
+.candidatura-form .form-group {
+    margin-bottom: 1.5rem;
+}
+
+.candidatura-form .form-control {
+    padding: 0.75rem;
+    border-radius: 6px;
+}
+
+.candidatura-form select.form-control {
+    appearance: auto;
+}
+
+.required {
+    color: #dc3545;
+}
+
+.alert-info-custom {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background: #e3f2fd;
+    border: 1px solid #90caf9;
+    border-radius: 8px;
+    padding: 1rem;
+    color: #1565c0;
+}
+
+.alert-info-custom i {
+    font-size: 1.5rem;
+}
+
+.form-actions {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid #e0e0e0;
+}
+
+.card-header.bg-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+}
+
+.card-header h4 {
+    margin: 0;
+    font-size: 1.1rem;
+}
+</style>
+{% endblock %}

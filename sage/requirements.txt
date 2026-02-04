@@ -3,3 +3,4 @@ psycopg2-binary
 python-dotenv
 djangorestframework>=3.14
 django-filter>=23.0
+faker>=18.0

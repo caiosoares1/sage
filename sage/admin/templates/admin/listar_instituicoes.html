@@ -84,6 +84,49 @@
                     </tbody>
                 </table>
             </div>
+
+            <!-- Paginação -->
+            {% if instituicoes.has_other_pages %}
+            <div class="pagination-container">
+                <nav aria-label="Navegação de páginas">
+                    <ul class="pagination">
+                        {% if instituicoes.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page=1{% if filtro_nome %}&nome={{ filtro_nome }}{% endif %}">
+                                <i class="fas fa-angle-double-left"></i> Primeira
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ instituicoes.previous_page_number }}{% if filtro_nome %}&nome={{ filtro_nome }}{% endif %}">
+                                <i class="fas fa-angle-left"></i> Anterior
+                            </a>
+                        </li>
+                        {% endif %}
+
+                        <li class="page-item disabled">
+                            <span class="page-link">Página {{ instituicoes.number }} de {{ instituicoes.paginator.num_pages }}</span>
+                        </li>
+
+                        {% if instituicoes.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ instituicoes.next_page_number }}{% if filtro_nome %}&nome={{ filtro_nome }}{% endif %}">
+                                Próxima <i class="fas fa-angle-right"></i>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ instituicoes.paginator.num_pages }}{% if filtro_nome %}&nome={{ filtro_nome }}{% endif %}">
+                                Última <i class="fas fa-angle-double-right"></i>
+                            </a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                <p class="pagination-info">
+                    Mostrando {{ instituicoes.start_index }}-{{ instituicoes.end_index }} de {{ instituicoes.paginator.count }} instituições
+                </p>
+            </div>
+            {% endif %}
+
             {% else %}
             <div class="empty-state">
                 <i class="fas fa-university fa-3x"></i>

@@ -5,8 +5,8 @@
 {% block content %}
 <div class="container">
     <div class="page-header">
-        <h2><i class="fas fa-briefcase"></i> Vagas Disponíveis</h2>
-        <p class="subtitle">Lista de vagas aprovadas e disponíveis para vínculo</p>
+        <h2><i class="fas fa-briefcase"></i> Vagas de Estágio Disponíveis</h2>
+        <p class="subtitle">Encontre a vaga ideal e candidate-se!</p>
     </div>
 
     {% if messages %}
@@ -16,6 +16,20 @@
             {{ message }}
         </div>
         {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Alertas para o aluno -->
+    {% if tem_estagio_ativo %}
+    <div class="alert alert-info-custom">
+        <i class="fas fa-info-circle"></i>
+        Você já está vinculado a um estágio. Acesse <a href="{% url 'acompanhar_estagios' %}">Meus Estágios</a> para acompanhar.
+    </div>
+    {% elif solicitacao_pendente %}
+    <div class="alert alert-warning-custom">
+        <i class="fas fa-clock"></i>
+        Você possui uma candidatura pendente para "<strong>{{ solicitacao_pendente.titulo }}</strong>".
+        Aguarde a análise do coordenador.
     </div>
     {% endif %}
 
@@ -60,15 +74,19 @@
                         <p><i class="fas fa-user-tie"></i> {{ vaga.cargo }}</p>
                         <p><i class="fas fa-clock"></i> {{ vaga.carga_horaria }}h/semana</p>
                         <p><i class="fas fa-calendar"></i> {{ vaga.data_inicio|date:"d/m/Y" }} a {{ vaga.data_fim|date:"d/m/Y" }}</p>
+                        {% if vaga.supervisor %}
                         <p><i class="fas fa-user"></i> Supervisor: {{ vaga.supervisor.nome }}</p>
+                        {% endif %}
                     </div>
                     <div class="vaga-footer">
                         <a href="{% url 'detalhe_vaga' vaga.id %}" class="btn btn-info btn-sm">
                             <i class="fas fa-eye"></i> Ver Detalhes
                         </a>
-                        <a href="{% url 'selecionar_aluno_vaga' vaga.id %}" class="btn btn-primary btn-sm">
-                            <i class="fas fa-link"></i> Vincular Aluno
+                        {% if not tem_estagio_ativo and not solicitacao_pendente %}
+                        <a href="{% url 'candidatar_vaga' vaga.id %}" class="btn btn-success btn-sm">
+                            <i class="fas fa-paper-plane"></i> Candidatar-se
                         </a>
+                        {% endif %}
                     </div>
                 </div>
                 {% endfor %}
@@ -76,8 +94,8 @@
             {% else %}
             <div class="empty-state">
                 <i class="fas fa-briefcase fa-3x"></i>
-                <h3>Nenhuma vaga disponível</h3>
-                <p>Não há vagas aprovadas disponíveis para vínculo no momento.</p>
+                <h3>Nenhuma vaga disponível no momento</h3>
+                <p class="text-muted">Novas vagas serão publicadas em breve. Fique atento!</p>
             </div>
             {% endif %}
         </div>

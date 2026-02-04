@@ -85,6 +85,49 @@
                     </tbody>
                 </table>
             </div>
+
+            <!-- Paginação -->
+            {% if empresas.has_other_pages %}
+            <div class="pagination-container">
+                <nav aria-label="Navegação de páginas">
+                    <ul class="pagination">
+                        {% if empresas.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page=1{% if filtro_razao %}&razao={{ filtro_razao }}{% endif %}{% if filtro_cnpj %}&cnpj={{ filtro_cnpj }}{% endif %}">
+                                <i class="fas fa-angle-double-left"></i> Primeira
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ empresas.previous_page_number }}{% if filtro_razao %}&razao={{ filtro_razao }}{% endif %}{% if filtro_cnpj %}&cnpj={{ filtro_cnpj }}{% endif %}">
+                                <i class="fas fa-angle-left"></i> Anterior
+                            </a>
+                        </li>
+                        {% endif %}
+
+                        <li class="page-item disabled">
+                            <span class="page-link">Página {{ empresas.number }} de {{ empresas.paginator.num_pages }}</span>
+                        </li>
+
+                        {% if empresas.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ empresas.next_page_number }}{% if filtro_razao %}&razao={{ filtro_razao }}{% endif %}{% if filtro_cnpj %}&cnpj={{ filtro_cnpj }}{% endif %}">
+                                Próxima <i class="fas fa-angle-right"></i>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ empresas.paginator.num_pages }}{% if filtro_razao %}&razao={{ filtro_razao }}{% endif %}{% if filtro_cnpj %}&cnpj={{ filtro_cnpj }}{% endif %}">
+                                Última <i class="fas fa-angle-double-right"></i>
+                            </a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                <p class="pagination-info">
+                    Mostrando {{ empresas.start_index }}-{{ empresas.end_index }} de {{ empresas.paginator.count }} empresas
+                </p>
+            </div>
+            {% endif %}
+
             {% else %}
             <div class="empty-state">
                 <i class="fas fa-building fa-3x"></i>
