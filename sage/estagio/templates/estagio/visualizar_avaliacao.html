@@ -1,0 +1,261 @@
+{% extends 'base.html' %}
+
+{% block title %}Avaliação #{{ avaliacao.id }} - Sistema de Gestão de Estágios{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h2><i class="fas fa-clipboard-check"></i> Visualizar Avaliação</h2>
+        <a href="{% url 'supervisor:documentos' %}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Voltar
+        </a>
+    </div>
+
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <div class="col-8">
+            <!-- Informações da Avaliação -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3><i class="fas fa-info-circle"></i> Informações da Avaliação</h3>
+                    <span class="badge badge-{{ avaliacao.status }}">
+                        {{ avaliacao.get_status_display }}
+                    </span>
+                </div>
+                <div class="card-body">
+                    <div class="info-grid">
+                        <div class="info-group">
+                            <label>Aluno</label>
+                            <p>{{ avaliacao.aluno.nome|default:"Não vinculado" }}</p>
+                        </div>
+                        <div class="info-group">
+                            <label>Estágio</label>
+                            <p>{{ avaliacao.estagio.titulo }}</p>
+                        </div>
+                        <div class="info-group">
+                            <label>Empresa</label>
+                            <p>{{ avaliacao.estagio.empresa.razao_social }}</p>
+                        </div>
+                        <div class="info-group">
+                            <label>Supervisor</label>
+                            <p>{{ avaliacao.supervisor.nome }}</p>
+                        </div>
+                        <div class="info-group">
+                            <label>Período</label>
+                            <p>{{ avaliacao.get_periodo_display }}</p>
+                        </div>
+                        <div class="info-group">
+                            <label>Período Avaliado</label>
+                            <p>{{ avaliacao.periodo_inicio|date:"d/m/Y" }} a {{ avaliacao.periodo_fim|date:"d/m/Y" }}</p>
+                        </div>
+                        <div class="info-group">
+                            <label>Data da Avaliação</label>
+                            <p>{{ avaliacao.data_avaliacao|date:"d/m/Y" }}</p>
+                        </div>
+                        {% if avaliacao.data_emissao_parecer %}
+                        <div class="info-group">
+                            <label>Data do Parecer</label>
+                            <p>{{ avaliacao.data_emissao_parecer|date:"d/m/Y H:i" }}</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Notas dos Critérios -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3><i class="fas fa-star"></i> Notas por Critério</h3>
+                </div>
+                <div class="card-body">
+                    {% if notas_criterios %}
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Critério</th>
+                                    <th>Peso</th>
+                                    <th>Nota</th>
+                                    <th>Observação</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for nc in notas_criterios %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ nc.criterio.nome }}</strong>
+                                        {% if nc.criterio.obrigatorio %}
+                                        <span class="badge badge-warning">Obrigatório</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ nc.criterio.peso }}</td>
+                                    <td>
+                                        <span class="nota-badge">{{ nc.nota|floatformat:1 }}</span>
+                                    </td>
+                                    <td>{{ nc.observacao|default:"-" }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted">Nenhuma nota registrada.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Parecer Final -->
+            {% if avaliacao.parecer_final %}
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-file-alt"></i> Parecer Final</h3>
+                    {% if avaliacao.parecer_disponivel_consulta %}
+                    <span class="badge badge-success">
+                        <i class="fas fa-eye"></i> Disponível para consulta
+                    </span>
+                    {% else %}
+                    <span class="badge badge-secondary">
+                        <i class="fas fa-eye-slash"></i> Não disponível para consulta
+                    </span>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    <div class="parecer-texto">
+                        {{ avaliacao.parecer_final }}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="col-4">
+            <!-- Card de Nota Final -->
+            <div class="card nota-final-card">
+                <div class="card-header">
+                    <h3><i class="fas fa-trophy"></i> Nota Final</h3>
+                </div>
+                <div class="card-body text-center">
+                    <div class="nota-display">
+                        {% if avaliacao.nota_final %}
+                        <span class="nota-valor">{{ avaliacao.nota_final|floatformat:2 }}</span>
+                        {% elif avaliacao.nota %}
+                        <span class="nota-valor">{{ avaliacao.nota|floatformat:2 }}</span>
+                        {% else %}
+                        <span class="nota-valor text-muted">-</span>
+                        {% endif %}
+                    </div>
+                    <p class="nota-legenda">
+                        Média ponderada dos critérios
+                    </p>
+                </div>
+            </div>
+
+            <!-- Status -->
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h3><i class="fas fa-tasks"></i> Status</h3>
+                </div>
+                <div class="card-body">
+                    <ul class="status-list">
+                        <li class="{% if avaliacao.status in 'rascunho,completa,enviada,parecer_emitido' %}completed{% endif %}">
+                            <i class="fas fa-check-circle"></i>
+                            Avaliação Criada
+                        </li>
+                        <li class="{% if avaliacao.status in 'completa,enviada,parecer_emitido' %}completed{% endif %}">
+                            <i class="fas fa-check-circle"></i>
+                            Critérios Preenchidos
+                        </li>
+                        <li class="{% if avaliacao.status == 'parecer_emitido' %}completed{% endif %}">
+                            <i class="fas fa-check-circle"></i>
+                            Parecer Emitido
+                        </li>
+                        <li class="{% if avaliacao.parecer_disponivel_consulta %}completed{% endif %}">
+                            <i class="fas fa-check-circle"></i>
+                            Disponível para Aluno
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+}
+
+.nota-badge {
+    background: #4a6cf7;
+    color: white;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-weight: bold;
+}
+
+.nota-final-card .nota-display {
+    padding: 20px;
+}
+
+.nota-display .nota-valor {
+    font-size: 4rem;
+    font-weight: bold;
+    color: #4a6cf7;
+}
+
+.nota-legenda {
+    color: #666;
+    margin-top: 10px;
+}
+
+.parecer-texto {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+}
+
+.status-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.status-list li {
+    padding: 12px 0;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #999;
+}
+
+.status-list li:last-child {
+    border-bottom: none;
+}
+
+.status-list li.completed {
+    color: #28a745;
+}
+
+.status-list li.completed i {
+    color: #28a745;
+}
+
+.status-list li i {
+    color: #ccc;
+}
+</style>
+{% endblock %}

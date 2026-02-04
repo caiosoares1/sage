@@ -51,4 +51,23 @@ urlpatterns = [
     path('relatorios/', views.gerar_relatorio_estagios, name='gerar_relatorio_estagios'),
     path('api/relatorios/', views.api_relatorio_estagios, name='api_relatorio_estagios'),
     path('api/relatorios/exportar/', views.api_relatorio_exportar, name='api_relatorio_exportar'),
+    
+    # ========== Sprint 03 - Novas Rotas ==========
+    
+    # Rotas de Vagas Disponíveis - TASK 22173, 22174
+    path('vagas/', views.listar_vagas_disponiveis, name='listar_vagas_disponiveis'),
+    path('vagas/<int:estagio_id>/', views.detalhe_vaga, name='detalhe_vaga'),
+    path('vagas/<int:estagio_id>/selecionar-aluno/', views.selecionar_aluno_vaga, name='selecionar_aluno_vaga'),
+    path('vagas/<int:estagio_id>/vincular/', views.vincular_aluno_vaga, name='vincular_aluno_vaga'),
+    
+    # Rotas de Atividades Pendentes - TASK 22180, 22181, 22182
+    path('atividades/', views.listar_atividades_pendentes, name='listar_atividades_pendentes'),
+    path('atividades/<int:atividade_id>/', views.detalhe_atividade, name='detalhe_atividade'),
+    path('atividades/<int:atividade_id>/confirmar/', views.confirmar_atividade, name='confirmar_atividade'),
+    path('atividades/<int:atividade_id>/rejeitar/', views.rejeitar_atividade, name='rejeitar_atividade'),
+    
+    # Rotas de Avaliação e Parecer - TASK 22186, 22191, 22193
+    path('avaliacao/<int:estagio_id>/criar/', views.formulario_avaliacao, name='formulario_avaliacao'),
+    path('avaliacao/<int:avaliacao_id>/parecer/', views.emitir_parecer, name='emitir_parecer'),
+    path('avaliacao/<int:avaliacao_id>/', views.visualizar_avaliacao, name='visualizar_avaliacao'),
 ]

@@ -1,0 +1,145 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ instituicao.nome }} - Sistema de Gestão de Estágios{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h2><i class="fas fa-university"></i> {{ instituicao.nome }}</h2>
+        <div class="header-actions">
+            <a href="{% url 'editar_instituicao' instituicao.id %}" class="btn btn-warning">
+                <i class="fas fa-edit"></i> Editar
+            </a>
+            <a href="{% url 'listar_instituicoes' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Voltar
+            </a>
+        </div>
+    </div>
+
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-info-circle"></i> Informações da Instituição</h3>
+                </div>
+                <div class="card-body">
+                    <div class="info-item">
+                        <label>Nome:</label>
+                        <span>{{ instituicao.nome }}</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Contato:</label>
+                        <span>{{ instituicao.contato }}</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Endereço:</label>
+                        <span>{{ instituicao.rua }}, {{ instituicao.numero }} - {{ instituicao.bairro }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-chart-pie"></i> Estatísticas</h3>
+                </div>
+                <div class="card-body">
+                    <div class="stat-item">
+                        <span class="stat-number">{{ alunos.count }}</span>
+                        <span class="stat-label">Alunos Vinculados</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number">{{ coordenadores.count }}</span>
+                        <span class="stat-label">Coordenadores</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Coordenadores -->
+    <div class="card mt-4">
+        <div class="card-header">
+            <h3><i class="fas fa-user-tie"></i> Coordenadores Vinculados</h3>
+        </div>
+        <div class="card-body">
+            {% if coordenadores %}
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Curso</th>
+                            <th>Contato</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for coordenador in coordenadores %}
+                        <tr>
+                            <td>{{ coordenador.nome }}</td>
+                            <td>{{ coordenador.nome_curso }}</td>
+                            <td>{{ coordenador.contato }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted">Nenhum coordenador vinculado a esta instituição.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Alunos -->
+    <div class="card mt-4">
+        <div class="card-header">
+            <h3><i class="fas fa-user-graduate"></i> Alunos Vinculados</h3>
+        </div>
+        <div class="card-body">
+            {% if alunos %}
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Matrícula</th>
+                            <th>Contato</th>
+                            <th>Estágio</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for aluno in alunos %}
+                        <tr>
+                            <td>{{ aluno.nome }}</td>
+                            <td>{{ aluno.matricula }}</td>
+                            <td>{{ aluno.contato }}</td>
+                            <td>
+                                {% if aluno.estagio %}
+                                <span class="badge badge-success">{{ aluno.estagio.titulo }}</span>
+                                {% else %}
+                                <span class="badge badge-secondary">Sem estágio</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted">Nenhum aluno vinculado a esta instituição.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

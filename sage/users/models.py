@@ -85,11 +85,16 @@ class NivelAcesso(models.Model):
 class Usuario(AbstractUser):
     # campo para definir o tipo do usuário
     USER_TYPES = (
+        ('admin', 'Administrador'),
         ('aluno', 'Aluno'),
         ('supervisor', 'Supervisor'),
         ('coordenador', 'Curso Coordenador'),
     )
     tipo = models.CharField(max_length=20, choices=USER_TYPES)
+    
+    def is_admin(self):
+        """Verifica se o usuário é administrador"""
+        return self.tipo == 'admin' or self.is_superuser
     
     nivel_acesso = models.ForeignKey(
         NivelAcesso,

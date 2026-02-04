@@ -1,0 +1,115 @@
+{% extends 'base.html' %}
+
+{% block title %}Editar {{ nivel.nome }} - Sistema de Gestão de Estágios{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h2><i class="fas fa-layer-group"></i> Editar Nível de Acesso</h2>
+        <p class="subtitle">Atualize as configurações do nível "{{ nivel.nome }}"</p>
+    </div>
+
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-edit"></i> Dados do Nível</h3>
+        </div>
+        <div class="card-body">
+            <form method="post" novalidate>
+                {% csrf_token %}
+                
+                <div class="form-section">
+                    <h4>Informações Básicas</h4>
+                    
+                    <div class="form-group">
+                        <label for="id_nome" class="required">Nome do Nível</label>
+                        {{ form.nome }}
+                        {% if form.nome.errors %}
+                        <small class="error-text">{{ form.nome.errors.0 }}</small>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="id_descricao">Descrição</label>
+                        {{ form.descricao }}
+                        {% if form.descricao.errors %}
+                        <small class="error-text">{{ form.descricao.errors.0 }}</small>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="form-group">
+                        <div class="form-check">
+                            {{ form.ativo }}
+                            <label for="id_ativo" class="form-check-label">
+                                Nível de acesso ativo
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-section">
+                    <h4>Permissões</h4>
+                    <p class="help-text">
+                        Selecione as permissões que os usuários com este nível terão acesso.
+                        <br>
+                        <strong>Atenção:</strong> Alterações nas permissões serão aplicadas imediatamente a todos os usuários associados.
+                    </p>
+                    
+                    <div class="permissoes-grid">
+                        {{ form.permissoes }}
+                    </div>
+                </div>
+                
+                <div class="alert alert-info mt-3">
+                    <i class="fas fa-info-circle"></i>
+                    Este nível está atribuído a <strong>{{ nivel.usuarios.count }}</strong> usuário(s).
+                    As alterações nas permissões serão aplicadas automaticamente.
+                </div>
+                
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Salvar Alterações
+                    </button>
+                    <a href="{% url 'users:visualizar_nivel_acesso' nivel.id %}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Cancelar
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+.permissoes-grid {
+    max-height: 400px;
+    overflow-y: auto;
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+}
+
+.permissoes-grid ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+}
+
+.permissoes-grid li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+</style>
+{% endblock %}

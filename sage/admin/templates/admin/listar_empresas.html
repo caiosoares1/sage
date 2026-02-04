@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+
+{% block title %}Empresas Cadastradas - Sistema de Gestão de Estágios{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h2><i class="fas fa-building"></i> Empresas Cadastradas</h2>
+        <a href="{% url 'cadastrar_empresa' %}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Nova Empresa
+        </a>
+    </div>
+
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Filtros -->
+    <div class="card filtros-card">
+        <div class="card-body">
+            <form method="get" class="filtros-form">
+                <div class="form-row">
+                    <div class="form-group col-5">
+                        <label for="razao">Razão Social</label>
+                        <input type="text" name="razao" id="razao" class="form-control" 
+                               value="{{ filtro_razao }}" placeholder="Buscar por razão social...">
+                    </div>
+                    <div class="form-group col-4">
+                        <label for="cnpj">CNPJ</label>
+                        <input type="text" name="cnpj" id="cnpj" class="form-control" 
+                               value="{{ filtro_cnpj }}" placeholder="Buscar por CNPJ...">
+                    </div>
+                    <div class="form-group col-3 align-self-end">
+                        <button type="submit" class="btn btn-secondary btn-block">
+                            <i class="fas fa-search"></i> Filtrar
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Lista de Empresas -->
+    <div class="card">
+        <div class="card-body">
+            {% if empresas %}
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Razão Social</th>
+                            <th>CNPJ</th>
+                            <th>Endereço</th>
+                            <th>Supervisores</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for empresa in empresas %}
+                        <tr>
+                            <td>
+                                <strong>{{ empresa.razao_social }}</strong>
+                            </td>
+                            <td>{{ empresa.cnpj }}</td>
+                            <td>{{ empresa.rua }}, {{ empresa.numero }} - {{ empresa.bairro }}</td>
+                            <td>
+                                <span class="badge badge-info">{{ empresa.total_supervisores }}</span>
+                            </td>
+                            <td class="actions">
+                                <a href="{% url 'visualizar_empresa' empresa.id %}" class="btn btn-sm btn-info" title="Visualizar">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <a href="{% url 'editar_empresa' empresa.id %}" class="btn btn-sm btn-warning" title="Editar">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-building fa-3x"></i>
+                <h3>Nenhuma empresa cadastrada</h3>
+                <p>Clique no botão "Nova Empresa" para cadastrar a primeira empresa.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

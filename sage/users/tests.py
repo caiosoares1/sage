@@ -1261,14 +1261,26 @@ class NivelAcessoFormCA1Test(TestCase):
         self.assertTrue(form.is_valid())
     
     def test_ca1_ativo_default_true(self):
-        """CA1 - Testa que ativo é True por padrão"""
+        """CA1 - Testa que ativo é True por padrão quando marcado"""
         form = NivelAcessoForm(data={
-            'nome': 'Nível Padrão'
+            'nome': 'Nível Padrão',
+            'ativo': True  # Checkbox marcado = True enviado
         })
         
         self.assertTrue(form.is_valid())
         nivel = form.save()
         self.assertTrue(nivel.ativo)
+    
+    def test_ca1_ativo_false_quando_nao_marcado(self):
+        """CA1 - Testa que ativo é False quando checkbox não marcado"""
+        form = NivelAcessoForm(data={
+            'nome': 'Nível Inativo'
+            # ativo não passado = checkbox não marcado = False
+        })
+        
+        self.assertTrue(form.is_valid())
+        nivel = form.save()
+        self.assertFalse(nivel.ativo)
 
 
 class NivelAcessoEditFormCA1CA2Test(TestCase):

@@ -15,17 +15,27 @@ urlpatterns = [
     path('coordenador/documentos/', views.aprovar_documentos_coordenador, name='aprovar_documentos_coordenador'),
     path('documentos/<int:documento_id>/aprovar-coordenador/', views.aprovar_documento_coordenador, name='aprovar_documento_coordenador'),
     
-    # Rotas de Empresa - MIGRADAS PARA API REST
-    # Use os endpoints em /api/empresas/ para gerenciar empresas.
-    # GET /api/empresas/ - Lista empresas
-    # POST /api/empresas/ - Cria empresa
-    # GET /api/empresas/{id}/ - Detalhe empresa
-    # PUT/PATCH /api/empresas/{id}/ - Atualiza empresa
-    # DELETE /api/empresas/{id}/ - Remove empresa
+    # Rotas de Instituição (CRUD)
+    path('instituicoes/', views.listar_instituicoes, name='listar_instituicoes'),
+    path('instituicoes/cadastrar/', views.cadastrar_instituicao, name='cadastrar_instituicao'),
+    path('instituicoes/<int:instituicao_id>/', views.visualizar_instituicao, name='visualizar_instituicao'),
+    path('instituicoes/<int:instituicao_id>/editar/', views.editar_instituicao, name='editar_instituicao'),
     
-    # Rotas de Supervisor (CRUD)
+    # Rotas de Empresa (CRUD) - Sprint 03 - TASK 22167
+    path('empresas/', views.listar_empresas, name='listar_empresas'),
+    path('empresas/cadastrar/', views.cadastrar_empresa, name='cadastrar_empresa'),
+    path('empresas/<int:empresa_id>/', views.visualizar_empresa, name='visualizar_empresa'),
+    path('empresas/<int:empresa_id>/editar/', views.editar_empresa, name='editar_empresa'),
+    
+    # Rotas de Supervisor (CRUD) - Sprint 03 - TASK 22168, 22169
     path('supervisores/', views.listar_supervisores, name='listar_supervisores'),
     path('supervisores/cadastrar/', views.cadastrar_supervisor, name='cadastrar_supervisor'),
     path('supervisores/<int:supervisor_id>/', views.visualizar_supervisor, name='visualizar_supervisor'),
     path('supervisores/<int:supervisor_id>/editar/', views.editar_supervisor, name='editar_supervisor'),
+    
+    # Painel de Estágios para Admin - Sprint 03 - TASK 22208, 22209
+    path('painel-estagios/', views.painel_estagios, name='admin_painel_estagios'),
+    
+    # Monitoramento de Pendências para Admin - Sprint 03 - TASK 22213, 22214
+    path('pendencias/', views.monitoramento_pendencias, name='admin_monitoramento_pendencias'),
 ]

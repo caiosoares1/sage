@@ -1,0 +1,365 @@
+{% extends 'base.html' %}
+
+{% block title %}Monitoramento de Pendências - Sistema de Gestão de Estágios{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h2><i class="fas fa-exclamation-triangle"></i> Monitoramento de Pendências</h2>
+        <p class="subtitle">Acompanhe todas as pendências do sistema por tipo e prioridade</p>
+    </div>
+
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Cards de Resumo -->
+    <div class="pendencias-resumo">
+        <div class="pendencia-card critica">
+            <i class="fas fa-exclamation-circle"></i>
+            <span class="valor">{{ pendencias_criticas }}</span>
+            <span class="label">Críticas</span>
+        </div>
+        <div class="pendencia-card alta">
+            <i class="fas fa-exclamation-triangle"></i>
+            <span class="valor">{{ pendencias_alta }}</span>
+            <span class="label">Alta Prioridade</span>
+        </div>
+        <div class="pendencia-card media">
+            <i class="fas fa-clock"></i>
+            <span class="valor">{{ pendencias_media }}</span>
+            <span class="label">Média Prioridade</span>
+        </div>
+        <div class="pendencia-card baixa">
+            <i class="fas fa-info-circle"></i>
+            <span class="valor">{{ pendencias_baixa }}</span>
+            <span class="label">Baixa Prioridade</span>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="card filtros-card mt-4">
+        <div class="card-body">
+            <form method="get" class="filtros-form">
+                <div class="form-row">
+                    <div class="form-group col-3">
+                        <label for="tipo">Tipo de Pendência</label>
+                        <select name="tipo" id="tipo" class="form-control">
+                            <option value="">Todos os tipos</option>
+                            <option value="documento" {% if filtro_tipo == 'documento' %}selected{% endif %}>Documentos</option>
+                            <option value="atividade" {% if filtro_tipo == 'atividade' %}selected{% endif %}>Atividades</option>
+                            <option value="avaliacao" {% if filtro_tipo == 'avaliacao' %}selected{% endif %}>Avaliações</option>
+                            <option value="relatorio" {% if filtro_tipo == 'relatorio' %}selected{% endif %}>Relatórios</option>
+                        </select>
+                    </div>
+                    <div class="form-group col-3">
+                        <label for="prioridade">Prioridade</label>
+                        <select name="prioridade" id="prioridade" class="form-control">
+                            <option value="">Todas</option>
+                            <option value="critica" {% if filtro_prioridade == 'critica' %}selected{% endif %}>Crítica</option>
+                            <option value="alta" {% if filtro_prioridade == 'alta' %}selected{% endif %}>Alta</option>
+                            <option value="media" {% if filtro_prioridade == 'media' %}selected{% endif %}>Média</option>
+                            <option value="baixa" {% if filtro_prioridade == 'baixa' %}selected{% endif %}>Baixa</option>
+                        </select>
+                    </div>
+                    <div class="form-group col-3">
+                        <label for="responsavel">Responsável</label>
+                        <select name="responsavel" id="responsavel" class="form-control">
+                            <option value="">Todos</option>
+                            <option value="aluno" {% if filtro_responsavel == 'aluno' %}selected{% endif %}>Aluno</option>
+                            <option value="supervisor" {% if filtro_responsavel == 'supervisor' %}selected{% endif %}>Supervisor</option>
+                            <option value="coordenador" {% if filtro_responsavel == 'coordenador' %}selected{% endif %}>Coordenador</option>
+                        </select>
+                    </div>
+                    <div class="form-group col-3 align-self-end">
+                        <button type="submit" class="btn btn-secondary btn-block">
+                            <i class="fas fa-search"></i> Filtrar
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Pendências por Tipo -->
+    <div class="row mt-4">
+        <!-- Documentos Pendentes -->
+        <div class="col-6">
+            <div class="card">
+                <div class="card-header card-header-warning">
+                    <h3><i class="fas fa-file-alt"></i> Documentos Pendentes</h3>
+                </div>
+                <div class="card-body">
+                    {% if documentos_pendentes %}
+                    <ul class="pendencias-list">
+                        {% for doc in documentos_pendentes %}
+                        <li class="pendencia-item prioridade-{{ doc.prioridade|default:'media' }}">
+                            <div class="pendencia-info">
+                                <span class="pendencia-titulo">{{ doc.tipo_documento.nome }}</span>
+                                <span class="pendencia-detalhe">
+                                    {{ doc.estagio.aluno.usuario.first_name }} {{ doc.estagio.aluno.usuario.last_name }}
+                                </span>
+                                <span class="pendencia-data">
+                                    <i class="fas fa-calendar"></i> Prazo: {{ doc.prazo_entrega|date:"d/m/Y" }}
+                                </span>
+                            </div>
+                            <div class="pendencia-status">
+                                {% if doc.dias_atraso > 0 %}
+                                <span class="badge badge-danger">{{ doc.dias_atraso }} dias atrasado</span>
+                                {% elif doc.dias_restantes <= 3 %}
+                                <span class="badge badge-warning">{{ doc.dias_restantes }} dias</span>
+                                {% else %}
+                                <span class="badge badge-info">{{ doc.dias_restantes }} dias</span>
+                                {% endif %}
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="text-muted text-center">Nenhum documento pendente</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Atividades Pendentes -->
+        <div class="col-6">
+            <div class="card">
+                <div class="card-header card-header-info">
+                    <h3><i class="fas fa-tasks"></i> Atividades Pendentes</h3>
+                </div>
+                <div class="card-body">
+                    {% if atividades_pendentes %}
+                    <ul class="pendencias-list">
+                        {% for ativ in atividades_pendentes %}
+                        <li class="pendencia-item prioridade-{{ ativ.prioridade|default:'media' }}">
+                            <div class="pendencia-info">
+                                <span class="pendencia-titulo">{{ ativ.descricao|truncatewords:8 }}</span>
+                                <span class="pendencia-detalhe">
+                                    {{ ativ.estagio.aluno.usuario.first_name }} {{ ativ.estagio.aluno.usuario.last_name }}
+                                </span>
+                                <span class="pendencia-data">
+                                    <i class="fas fa-clock"></i> {{ ativ.horas }} horas
+                                </span>
+                            </div>
+                            <div class="pendencia-status">
+                                <a href="{% url 'estagio:detalhe_atividade' ativ.id %}" class="btn btn-sm btn-primary">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="text-muted text-center">Nenhuma atividade pendente de aprovação</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <!-- Avaliações Pendentes -->
+        <div class="col-6">
+            <div class="card">
+                <div class="card-header card-header-success">
+                    <h3><i class="fas fa-star"></i> Avaliações Pendentes</h3>
+                </div>
+                <div class="card-body">
+                    {% if avaliacoes_pendentes %}
+                    <ul class="pendencias-list">
+                        {% for aval in avaliacoes_pendentes %}
+                        <li class="pendencia-item prioridade-{{ aval.prioridade|default:'alta' }}">
+                            <div class="pendencia-info">
+                                <span class="pendencia-titulo">
+                                    {{ aval.estagio.aluno.usuario.first_name }} {{ aval.estagio.aluno.usuario.last_name }}
+                                </span>
+                                <span class="pendencia-detalhe">
+                                    {{ aval.estagio.empresa.nome }}
+                                </span>
+                                <span class="pendencia-data">
+                                    <i class="fas fa-calendar-alt"></i> Fim: {{ aval.estagio.data_fim|date:"d/m/Y" }}
+                                </span>
+                            </div>
+                            <div class="pendencia-status">
+                                <a href="{% url 'estagio:avaliacao_criar' aval.estagio.id %}" class="btn btn-sm btn-success">
+                                    <i class="fas fa-plus"></i> Avaliar
+                                </a>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="text-muted text-center">Nenhuma avaliação pendente</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Relatórios Pendentes -->
+        <div class="col-6">
+            <div class="card">
+                <div class="card-header card-header-danger">
+                    <h3><i class="fas fa-file-contract"></i> Relatórios Pendentes</h3>
+                </div>
+                <div class="card-body">
+                    {% if relatorios_pendentes %}
+                    <ul class="pendencias-list">
+                        {% for rel in relatorios_pendentes %}
+                        <li class="pendencia-item prioridade-{{ rel.prioridade|default:'media' }}">
+                            <div class="pendencia-info">
+                                <span class="pendencia-titulo">{{ rel.tipo }}</span>
+                                <span class="pendencia-detalhe">
+                                    {{ rel.estagio.aluno.usuario.first_name }} {{ rel.estagio.aluno.usuario.last_name }}
+                                </span>
+                                <span class="pendencia-data">
+                                    <i class="fas fa-calendar"></i> Prazo: {{ rel.prazo|date:"d/m/Y" }}
+                                </span>
+                            </div>
+                            <div class="pendencia-status">
+                                {% if rel.atrasado %}
+                                <span class="badge badge-danger pulse">ATRASADO</span>
+                                {% else %}
+                                <span class="badge badge-warning">Pendente</span>
+                                {% endif %}
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p class="text-muted text-center">Nenhum relatório pendente</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.pendencias-resumo {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+}
+
+.pendencia-card {
+    padding: 25px;
+    border-radius: 10px;
+    text-align: center;
+    color: white;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+}
+
+.pendencia-card.critica {
+    background: linear-gradient(135deg, #dc3545, #c82333);
+}
+
+.pendencia-card.alta {
+    background: linear-gradient(135deg, #fd7e14, #e06b10);
+}
+
+.pendencia-card.media {
+    background: linear-gradient(135deg, #ffc107, #e0a800);
+    color: #333;
+}
+
+.pendencia-card.baixa {
+    background: linear-gradient(135deg, #17a2b8, #138496);
+}
+
+.pendencia-card i {
+    font-size: 2em;
+    display: block;
+    margin-bottom: 10px;
+}
+
+.pendencia-card .valor {
+    font-size: 2.5em;
+    font-weight: bold;
+    display: block;
+}
+
+.pendencia-card .label {
+    font-size: 0.9em;
+    opacity: 0.9;
+}
+
+.card-header-warning { background: linear-gradient(135deg, #ffc107, #e0a800); color: #333; }
+.card-header-info { background: linear-gradient(135deg, #17a2b8, #138496); color: white; }
+.card-header-success { background: linear-gradient(135deg, #28a745, #218838); color: white; }
+.card-header-danger { background: linear-gradient(135deg, #dc3545, #c82333); color: white; }
+
+.pendencias-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.pendencia-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    background: #f8f9fa;
+    border-left: 4px solid #ccc;
+}
+
+.pendencia-item.prioridade-critica {
+    border-left-color: #dc3545;
+    background: #fff5f5;
+}
+
+.pendencia-item.prioridade-alta {
+    border-left-color: #fd7e14;
+    background: #fff8f0;
+}
+
+.pendencia-item.prioridade-media {
+    border-left-color: #ffc107;
+}
+
+.pendencia-item.prioridade-baixa {
+    border-left-color: #17a2b8;
+}
+
+.pendencia-info {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.pendencia-titulo {
+    font-weight: bold;
+    color: #333;
+}
+
+.pendencia-detalhe {
+    color: #666;
+    font-size: 0.9em;
+}
+
+.pendencia-data {
+    color: #888;
+    font-size: 0.85em;
+}
+
+.badge.pulse {
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+</style>
+{% endblock %}
